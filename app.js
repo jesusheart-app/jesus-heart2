@@ -1325,6 +1325,167 @@ async function renderCommunityPrayerReactions(prayer, container) {
   }
 }
 
+async function saveCommunityPrayerComment(prayer, input, button, container) {
+  const content = input.value.trim();
+
+  if (!content) {
+    return;
+  }
+
+  if (content.length > 500) {
+    setMessage(
+      "community-prayer-message",
+      "댓글은 500자 이내로 입력해주세요.",
+      "error"
+    );
+    return;
+  }
+
+  button.disabled = true;
+  button.textContent = "등록 중...";
+
+  try {
+    const reference = doc(
+      collection(db, "communityPrayers", prayer.id, "comments")
+    );
+    await setDoc(reference, {
+      uid: auth.currentUser.uid,
+      authorDisplay: currentUserProfile.name,
+      content,
+      createdAt: serverTimestamp()
+    });
+    input.value = "";
+    await renderCommunityPrayerComments(prayer, container);
+  } catch {
+    button.disabled = false;
+    button.textContent = "댓글 등록";
+    setMessage(
+      "community-prayer-message",
+      "댓글을 등록하지 못했습니다. 다시 시도해주세요.",
+      "error"
+    );
+  }
+}
+
+async function deleteCommunityPrayerComment(
+  prayer,
+  comment,
+  container
+) {
+  if (
+    comment.uid !== auth.currentUser?.uid ||
+    !window.confirm("이 댓글을 삭제하시겠습니까?")
+  ) {
+    return;
+  }
+
+  try {
+    await deleteDoc(
+      doc(
+        db,
+        "communityPrayers",
+        prayer.id,
+        "comments",
+        comment.id
+      )
+    );
+    await renderCommunityPrayerComments(prayer, container);
+  } catch {
+    setMessage(
+      "community-prayer-message",
+      "댓글을 삭제하지 못했습니다.",
+      "error"
+    );
+  }
+}
+
+async function renderCommunityPrayerComments(prayer, container) {
+  container.textContent = "댓글을 불러오는 중입니다.";
+
+  try {
+    const snapshot = await getDocs(
+      query(
+        collection(db, "communityPrayers", prayer.id, "comments"),
+        orderBy("createdAt", "asc")
+      )
+    );
+    container.replaceChildren();
+
+    const heading = document.createElement("h4");
+    heading.className = "prayer-comment-heading";
+    heading.textContent = "댓글 " + snapshot.size;
+    container.append(heading);
+
+    const list = document.createElement("div");
+    list.className = "prayer-comment-list";
+
+    if (snapshot.empty) {
+      const empty = document.createElement("p");
+      empty.className = "prayer-comment-empty";
+      empty.textContent = "아직 댓글이 없습니다.";
+      list.append(empty);
+    } else {
+      snapshot.docs.forEach((commentDocument) => {
+        const comment = {
+          id: commentDocument.id,
+          ...commentDocument.data()
+        };
+        const item = document.createElement("div");
+        item.className = "prayer-comment-item";
+
+        const meta = document.createElement("p");
+        meta.className = "prayer-comment-meta";
+        meta.textContent =
+          comment.authorDisplay + " · " +
+          formatPrayerDate(comment.createdAt);
+        item.append(meta);
+
+        const text = document.createElement("p");
+        text.className = "prayer-comment-text";
+        text.textContent = comment.content;
+        item.append(text);
+
+        if (comment.uid === auth.currentUser?.uid) {
+          const remove = document.createElement("button");
+          remove.type = "button";
+          remove.className = "prayer-comment-delete";
+          remove.textContent = "삭제";
+          remove.addEventListener("click", () =>
+            deleteCommunityPrayerComment(prayer, comment, container)
+          );
+          item.append(remove);
+        }
+
+        list.append(item);
+      });
+    }
+
+    container.append(list);
+
+    const form = document.createElement("div");
+    form.className = "prayer-comment-form";
+
+    const input = document.createElement("textarea");
+    input.rows = 2;
+    input.maxLength = 500;
+    input.placeholder = "함께 나눌 말을 남겨주세요";
+    input.setAttribute("aria-label", "기도 댓글");
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "secondary-button prayer-comment-submit";
+    button.textContent = "댓글 등록";
+    button.addEventListener("click", () =>
+      saveCommunityPrayerComment(prayer, input, button, container)
+    );
+
+    form.append(input, button);
+    container.append(form);
+  } catch {
+    container.textContent = "댓글을 불러오지 못했습니다.";
+  }
+}
+
 function renderCommunityPrayers(documents) {
   const list = document.getElementById("community-prayer-list");
   list.replaceChildren();
@@ -1386,6 +1547,12 @@ function renderCommunityPrayers(documents) {
     card.append(reactions);
 
     renderCommunityPrayerReactions(prayer, reactions);
+
+    const comments = document.createElement("div");
+    comments.className = "prayer-comments";
+    card.append(comments);
+    renderCommunityPrayerComments(prayer, comments);
+
     list.append(card);
   });
 }
@@ -1535,7 +1702,18 @@ async function deleteCommunityPrayer(prayerId) {
   }
 
   try {
-    await deleteDoc(doc(db, "communityPrayers", prayerId));
+    const prayerReference = doc(db, "communityPrayers", prayerId);
+    const commentsSnapshot = await getDocs(
+      collection(db, "communityPrayers", prayerId, "comments")
+    );
+    const batch = writeBatch(db);
+
+    commentsSnapshot.docs.forEach((commentDocument) => {
+      batch.delete(commentDocument.ref);
+    });
+    batch.delete(prayerReference);
+    await batch.commit();
+
     if (editingCommunityPrayerId === prayerId) {
       resetCommunityPrayerForm();
     }
