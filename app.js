@@ -11,11 +11,13 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import {
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
   getFirestore,
   serverTimestamp,
+  setDoc,
   updateDoc,
   writeBatch
 } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
@@ -351,6 +353,228 @@ async function logout() {
 }
 
 
+
+function getTodayDateKey() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+  return year + "-" + month + "-" + day;
+}
+
+function isValidBibleCheckDate(dateKey) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey) || dateKey > getTodayDateKey()) {
+    return false;
+  }
+
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+
+  return (
+    date.getFullYear() === year &&
+    date.getMonth() === month - 1 &&
+    date.getDate() === day
+  );
+}
+
+function formatBibleCheckDate(dateKey) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString("ko-KR", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    weekday: "short"
+  });
+}
+
+function getBibleCheckReference(dateKey) {
+  return doc(
+    db,
+    "users",
+    auth.currentUser.uid,
+    "bibleChecks",
+    dateKey
+  );
+}
+
+function renderBibleCheckSelection(dateKey, isChecked) {
+  const status = document.getElementById("bible-check-status");
+  const button = document.getElementById("bible-check-toggle-button");
+
+  status.textContent = isChecked
+    ? formatBibleCheckDate(dateKey) + " 말씀 읽음을 기록했습니다."
+    : formatBibleCheckDate(dateKey) + " 기록이 없습니다.";
+  status.dataset.checked = String(isChecked);
+
+  button.dataset.checked = String(isChecked);
+  button.textContent = isChecked ? "이 날짜의 체크 삭제" : "말씀 읽음 체크하기";
+  button.className = isChecked
+    ? "secondary-button"
+    : "primary-button";
+}
+
+async function loadBibleCheckForDate() {
+  const dateInput = document.getElementById("bible-check-date");
+  const dateKey = dateInput.value;
+
+  setMessage("bible-check-message", "");
+
+  if (!auth.currentUser || !isValidBibleCheckDate(dateKey)) {
+    setMessage(
+      "bible-check-message",
+      "오늘 또는 지난 날짜를 선택해주세요.",
+      "error"
+    );
+    return;
+  }
+
+  const snapshot = await getDoc(getBibleCheckReference(dateKey));
+  renderBibleCheckSelection(
+    dateKey,
+    snapshot.exists() && snapshot.data().checked === true
+  );
+}
+
+function renderBibleCheckHistory(documents) {
+  const list = document.getElementById("bible-check-history");
+  list.replaceChildren();
+
+  const records = documents
+    .filter((record) => record.data().checked === true)
+    .sort((first, second) => second.id.localeCompare(first.id));
+
+  if (records.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "bible-check-empty";
+    empty.textContent = "아직 기록한 날짜가 없습니다.";
+    list.append(empty);
+    return;
+  }
+
+  records.forEach((record) => {
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "bible-check-history-row";
+
+    const date = document.createElement("span");
+    date.textContent = formatBibleCheckDate(record.id);
+
+    const state = document.createElement("span");
+    state.className = "bible-check-history-state";
+    state.textContent = "읽음 완료";
+
+    row.append(date, state);
+    row.addEventListener("click", async () => {
+      document.getElementById("bible-check-date").value = record.id;
+      await loadBibleCheckForDate();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+
+    list.append(row);
+  });
+}
+
+async function loadBibleCheckHistory() {
+  const snapshot = await getDocs(
+    collection(db, "users", auth.currentUser.uid, "bibleChecks")
+  );
+  renderBibleCheckHistory(snapshot.docs);
+}
+
+async function openBibleCheck() {
+  if (!auth.currentUser || currentUserProfile?.approved !== true) {
+    showScreen("login-screen");
+    return;
+  }
+
+  const dateInput = document.getElementById("bible-check-date");
+  const today = getTodayDateKey();
+  dateInput.max = today;
+
+  if (!isValidBibleCheckDate(dateInput.value)) {
+    dateInput.value = today;
+  }
+
+  showScreen("bible-check-screen");
+  setMessage("bible-check-message", "기록을 불러오는 중입니다.");
+
+  try {
+    await Promise.all([
+      loadBibleCheckForDate(),
+      loadBibleCheckHistory()
+    ]);
+    setMessage("bible-check-message", "");
+  } catch {
+    setMessage(
+      "bible-check-message",
+      "말씀체크 기록을 불러오지 못했습니다. 다시 시도해주세요.",
+      "error"
+    );
+  }
+}
+
+async function toggleBibleCheck() {
+  const dateInput = document.getElementById("bible-check-date");
+  const button = document.getElementById("bible-check-toggle-button");
+  const dateKey = dateInput.value;
+  const isChecked = button.dataset.checked === "true";
+
+  setMessage("bible-check-message", "");
+
+  if (!auth.currentUser || !isValidBibleCheckDate(dateKey)) {
+    setMessage(
+      "bible-check-message",
+      "오늘 또는 지난 날짜를 선택해주세요.",
+      "error"
+    );
+    return;
+  }
+
+  if (isChecked && !window.confirm("정말 삭제하시겠습니까?")) {
+    return;
+  }
+
+  const originalButtonText = button.textContent;
+  button.disabled = true;
+  button.textContent = isChecked ? "삭제 중..." : "저장 중...";
+
+  try {
+    const reference = getBibleCheckReference(dateKey);
+
+    if (isChecked) {
+      await deleteDoc(reference);
+    } else {
+      await setDoc(reference, {
+        uid: auth.currentUser.uid,
+        date: dateKey,
+        checked: true,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+    }
+
+    await Promise.all([
+      loadBibleCheckForDate(),
+      loadBibleCheckHistory()
+    ]);
+
+    setMessage(
+      "bible-check-message",
+      isChecked ? "말씀체크 기록을 삭제했습니다." : "말씀 읽음을 기록했습니다.",
+      "success"
+    );
+  } catch {
+    button.textContent = originalButtonText;
+    setMessage(
+      "bible-check-message",
+      "기록을 변경하지 못했습니다. 잠시 후 다시 시도해주세요.",
+      "error"
+    );
+  } finally {
+    button.disabled = false;
+  }
+}
+
 function isCurrentUserApprovedAdmin() {
   return Boolean(
     auth.currentUser &&
@@ -583,6 +807,20 @@ document.getElementById("login-password").addEventListener("keydown", (event) =>
 });
 
 document
+  .getElementById("bible-check-date")
+  .addEventListener("change", async () => {
+    try {
+      await loadBibleCheckForDate();
+    } catch {
+      setMessage(
+        "bible-check-message",
+        "선택한 날짜의 기록을 확인하지 못했습니다.",
+        "error"
+      );
+    }
+  });
+
+document
   .getElementById("church-code")
   .addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
@@ -624,5 +862,7 @@ window.login = login;
 window.signup = signup;
 window.logout = logout;
 window.openAdminMembers = openAdminMembers;
+window.openBibleCheck = openBibleCheck;
+window.toggleBibleCheck = toggleBibleCheck;
 
 export { auth, db };

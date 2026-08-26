@@ -337,6 +337,88 @@
     }
 
     /* ========================================
+       말씀체크 데이터 뼈대
+    ======================================== */
+
+    .bible-check-form {
+      margin-top: 22px;
+    }
+
+    .bible-check-form label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .bible-check-form input {
+      width: 100%;
+      height: 54px;
+      padding: 0 14px;
+      border: 1px solid #DDD5C9;
+      border-radius: 14px;
+      background: #FCFBF8;
+      color: #3F3A34;
+      font-size: 17px;
+    }
+
+    .bible-check-status {
+      min-height: 28px;
+      margin: 16px 0 !important;
+      font-weight: 600;
+    }
+
+    .bible-check-status[data-checked="true"] {
+      color: #4E6B54;
+    }
+
+    .bible-check-message {
+      margin-top: 12px;
+      text-align: left;
+    }
+
+    .bible-check-history-guide {
+      margin-bottom: 18px !important;
+    }
+
+    .bible-check-history {
+      display: grid;
+      gap: 10px;
+    }
+
+    .bible-check-history-row {
+      width: 100%;
+      min-height: 54px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      border: 1px solid #E1D9CE;
+      border-radius: 14px;
+      background: #FCFBF8;
+      color: #4A433B;
+      font-size: 15px;
+      text-align: left;
+    }
+
+    .bible-check-history-state {
+      flex: 0 0 auto;
+      color: #4E6B54;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .bible-check-empty {
+      margin: 0;
+      padding: 18px;
+      border-radius: 14px;
+      background: #F8F5EF;
+      color: #71685F;
+      text-align: center;
+    }
+
+    /* ========================================
        관리자 회원관리 뼈대
     ======================================== */
 
