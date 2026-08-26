@@ -325,7 +325,7 @@
 
           <button
             class="menu-button"
-            onclick="showScreen('bible-check-screen')"
+            onclick="openBibleCheck()"
           >
             <span class="menu-icon">📖</span>
             <span class="menu-name">말씀체크</span>
@@ -509,27 +509,66 @@
       </header>
 
 
-      <main class="page-content">
+      <main class="page-content bible-check-content">
 
         <div class="page-card">
 
-          <h2>오늘 말씀을 읽으셨나요?</h2>
+          <h2>말씀을 읽은 날짜를 선택하세요</h2>
 
           <p>
-            자신의 성경으로 말씀을 읽고
-            읽은 날짜를 기록해보세요.
+            자신의 성경으로 말씀을 읽고 오늘이나 지난 날짜를 기록할 수 있습니다.
           </p>
+
+          <div class="bible-check-form">
+
+            <label for="bible-check-date">
+              읽은 날짜
+            </label>
+
+            <input
+              id="bible-check-date"
+              type="date"
+            >
+
+            <p
+              id="bible-check-status"
+              class="bible-check-status"
+              aria-live="polite"
+            ></p>
+
+            <button
+              id="bible-check-toggle-button"
+              class="primary-button"
+              type="button"
+              data-checked="false"
+              onclick="toggleBibleCheck()"
+            >
+              말씀 읽음 체크하기
+            </button>
+
+            <div
+              id="bible-check-message"
+              class="start-message bible-check-message"
+              aria-live="polite"
+            ></div>
+
+          </div>
 
         </div>
 
 
         <div class="page-card">
 
-          <h2>준비 중입니다</h2>
+          <h2>나의 말씀체크 기록</h2>
 
-          <p>
-            날짜별 말씀체크 기능을 이곳에 연결합니다.
+          <p class="bible-check-history-guide">
+            기록을 선택하면 지난 날짜의 체크를 확인하거나 삭제할 수 있습니다.
           </p>
+
+          <div
+            id="bible-check-history"
+            class="bible-check-history"
+          ></div>
 
         </div>
 
