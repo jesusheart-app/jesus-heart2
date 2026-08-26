@@ -337,6 +337,68 @@
     }
 
     /* ========================================
+       암송 체크 데이터 뼈대
+    ======================================== */
+
+    .memory-passage {
+      color: #4E6B54 !important;
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .memory-check-status {
+      min-height: 28px;
+      margin: 18px 0 !important;
+      font-weight: 600;
+    }
+
+    .memory-check-status[data-completed="true"] {
+      color: #4E6B54;
+    }
+
+    .memory-check-message {
+      margin-top: 12px;
+      text-align: left;
+    }
+
+    .memory-check-history {
+      display: grid;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .memory-check-history-row {
+      width: 100%;
+      min-height: 54px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      border: 1px solid #E1D9CE;
+      border-radius: 14px;
+      background: #FCFBF8;
+      color: #4A433B;
+      font-size: 15px;
+    }
+
+    .memory-check-history-state {
+      flex: 0 0 auto;
+      color: #4E6B54;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .memory-check-empty {
+      margin: 0;
+      padding: 18px;
+      border-radius: 14px;
+      background: #F8F5EF;
+      color: #71685F;
+      text-align: center;
+    }
+
+    /* ========================================
        말씀체크 데이터 뼈대
     ======================================== */
 
