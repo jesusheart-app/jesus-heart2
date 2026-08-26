@@ -2,6 +2,123 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function isApprovedAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.approved == true
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function hasValidSettings(settings) {
+      return settings.keys().hasOnly(['fontSize', 'notifications'])
+        && settings.fontSize in ['small', 'normal', 'large', 'extra-large']
+        && settings.notifications is bool;
+    }
+
+    match /users/{uid} {
+      allow create: if isOwner(uid)
+        && request.resource.data.keys().hasOnly([
+          'uid',
+          'memberId',
+          'name',
+          'nameNormalized',
+          'nameHash',
+          'role',
+          'approved',
+          'createdAt',
+          'settings'
+        ])
+        && request.resource.data.uid == uid
+        && request.resource.data.memberId is string
+        && request.resource.data.memberId.matches('^[A-HJ-NP-Z2-9]{6}$')
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 2
+        && request.resource.data.name.size() <= 40
+        && request.resource.data.nameNormalized is string
+        && request.resource.data.nameHash is string
+        && request.resource.data.nameHash.size() == 64
+        && request.resource.data.role == 'member'
+        && request.resource.data.approved == false
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.settings.fontSize == 'normal'
+        && request.resource.data.settings.notifications == false
+        && hasValidSettings(request.resource.data.settings);
+
+      allow read: if isOwner(uid) || isApprovedAdmin();
+
+      allow update: if (
+          isOwner(uid)
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['settings'])
+          && hasValidSettings(request.resource.data.settings)
+        ) || (
+          isApprovedAdmin()
+          && request.resource.data.keys().hasOnly([
+            'uid',
+            'memberId',
+            'name',
+            'nameNormalized',
+            'nameHash',
+            'role',
+            'approved',
+            'createdAt',
+            'settings'
+          ])
+          && request.resource.data.uid == resource.data.uid
+          && request.resource.data.memberId == resource.data.memberId
+          && request.resource.data.name == resource.data.name
+          && request.resource.data.nameNormalized == resource.data.nameNormalized
+          && request.resource.data.nameHash == resource.data.nameHash
+          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.role in ['member', 'admin']
+          && request.resource.data.approved is bool
+          && hasValidSettings(request.resource.data.settings)
+        );
+
+      allow delete: if isApprovedAdmin();
+    }
+
+    match /loginNames/{nameHash}/members/{uid} {
+      allow read: if true;
+
+      allow create: if isOwner(uid)
+        && request.resource.data.keys().hasOnly([
+          'uid',
+          'email',
+          'memberId',
+          'nameHash',
+          'createdAt'
+        ])
+        && request.resource.data.uid == uid
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.memberId.matches('^[A-HJ-NP-Z2-9]{6}$')
+        && request.resource.data.nameHash == nameHash
+        && request.resource.data.nameHash.size() == 64
+        && request.resource.data.createdAt == request.time;
+
+      allow update: if false;
+      allow delete: if isOwner(uid) || isApprovedAdmin();
+    }
+
+    match /memberIds/{memberId} {
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['uid', 'createdAt'])
+        && request.resource.data.uid == request.auth.uid
+        && memberId.matches('^[A-HJ-NP-Z2-9]{6}$')
+        && request.resource.data.createdAt == request.time;
+
+      allow read, update: if isApprovedAdmin();
+      allow delete: if isApprovedAdmin();
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }
