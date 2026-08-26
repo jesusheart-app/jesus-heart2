@@ -16,6 +16,7 @@ import {
   getDocs,
   getFirestore,
   serverTimestamp,
+  updateDoc,
   writeBatch
 } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import { firebaseConfig } from "./firebase-config.js";
@@ -27,6 +28,7 @@ const db = getFirestore(firebaseApp);
 const persistenceReady = setPersistence(auth, browserLocalPersistence);
 
 let signupInProgress = false;
+let currentUserProfile = null;
 
 function showScreen(screenId) {
   document.querySelectorAll(".screen").forEach((screen) => {
@@ -135,6 +137,12 @@ async function routeAuthenticatedUser(user) {
   }
 
   const profile = profileSnapshot.data();
+  currentUserProfile = profile;
+
+  const adminHomeButton = document.getElementById("admin-home-button");
+  if (adminHomeButton) {
+    adminHomeButton.hidden = !(profile.approved && profile.role === "admin");
+  }
 
   if (!profile.approved) {
     document.getElementById("pending-name").textContent =
@@ -342,6 +350,213 @@ async function logout() {
   }
 }
 
+
+function isCurrentUserApprovedAdmin() {
+  return Boolean(
+    auth.currentUser &&
+    currentUserProfile?.approved === true &&
+    currentUserProfile?.role === "admin"
+  );
+}
+
+function formatCreatedAt(createdAt) {
+  if (!createdAt || typeof createdAt.toDate !== "function") {
+    return "가입일 확인 중";
+  }
+
+  return createdAt.toDate().toLocaleDateString("ko-KR", {
+    year: "numeric",
+    month: "long",
+    day: "numeric"
+  });
+}
+
+function createMemberBadge(text, type) {
+  const badge = document.createElement("span");
+  badge.className = "member-badge member-badge-" + type;
+  badge.textContent = text;
+  return badge;
+}
+
+function createAdminActionButton(label, className, onClick) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = className;
+  button.textContent = label;
+  button.addEventListener("click", () => onClick(button));
+  return button;
+}
+
+function renderAdminMembers(memberDocuments) {
+  const list = document.getElementById("admin-member-list");
+  const summary = document.getElementById("admin-summary");
+
+  list.replaceChildren();
+
+  const members = memberDocuments
+    .map((memberDocument) => ({
+      uid: memberDocument.id,
+      ...memberDocument.data()
+    }))
+    .sort((first, second) => {
+      if (first.approved !== second.approved) {
+        return first.approved ? 1 : -1;
+      }
+
+      return String(first.name).localeCompare(String(second.name), "ko");
+    });
+
+  const pendingCount = members.filter((member) => !member.approved).length;
+  summary.textContent =
+    "전체 " + members.length + "명 · 승인 대기 " + pendingCount + "명";
+
+  if (members.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "admin-empty";
+    empty.textContent = "가입한 회원이 없습니다.";
+    list.append(empty);
+    return;
+  }
+
+  members.forEach((member) => {
+    const card = document.createElement("article");
+    card.className = "member-card";
+
+    const heading = document.createElement("div");
+    heading.className = "member-card-heading";
+
+    const name = document.createElement("h2");
+    name.textContent = member.name || "이름 없음";
+    heading.append(name);
+
+    const badges = document.createElement("div");
+    badges.className = "member-badges";
+    badges.append(
+      createMemberBadge(
+        member.approved ? "승인됨" : "승인 대기",
+        member.approved ? "approved" : "pending"
+      ),
+      createMemberBadge(
+        member.role === "admin" ? "관리자" : "일반회원",
+        member.role === "admin" ? "admin" : "member"
+      )
+    );
+    heading.append(badges);
+    card.append(heading);
+
+    const details = document.createElement("p");
+    details.className = "member-details";
+    details.textContent =
+      "회원번호 " + (member.memberId || "-") + " · " +
+      formatCreatedAt(member.createdAt);
+    card.append(details);
+
+    const actions = document.createElement("div");
+    actions.className = "member-actions";
+
+    if (member.uid === auth.currentUser?.uid) {
+      const currentAdmin = document.createElement("p");
+      currentAdmin.className = "current-admin-note";
+      currentAdmin.textContent = "현재 로그인한 관리자 계정";
+      actions.append(currentAdmin);
+    } else {
+      if (!member.approved) {
+        actions.append(
+          createAdminActionButton(
+            "가입 승인",
+            "primary-button admin-action-button",
+            (button) => updateMemberAccess(member.uid, { approved: true }, button)
+          )
+        );
+      }
+
+      if (member.approved) {
+        const makeAdmin = member.role !== "admin";
+        actions.append(
+          createAdminActionButton(
+            makeAdmin ? "관리자로 지정" : "일반회원으로 변경",
+            "secondary-button admin-action-button",
+            (button) =>
+              updateMemberAccess(
+                member.uid,
+                { role: makeAdmin ? "admin" : "member" },
+                button
+              )
+          )
+        );
+      }
+    }
+
+    card.append(actions);
+    list.append(card);
+  });
+}
+
+async function loadAdminMembers() {
+  if (!isCurrentUserApprovedAdmin()) {
+    showScreen("home-screen");
+    return;
+  }
+
+  setMessage("admin-message", "회원 목록을 불러오는 중입니다.");
+  const snapshot = await getDocs(collection(db, "users"));
+  renderAdminMembers(snapshot.docs);
+  setMessage("admin-message", "");
+}
+
+async function updateMemberAccess(uid, changes, button) {
+  if (!isCurrentUserApprovedAdmin() || uid === auth.currentUser?.uid) {
+    setMessage(
+      "admin-message",
+      "현재 관리자 계정의 권한은 이 화면에서 변경할 수 없습니다.",
+      "error"
+    );
+    return;
+  }
+
+  const originalText = button.textContent;
+  button.disabled = true;
+  button.textContent = "처리 중...";
+
+  try {
+    await updateDoc(doc(db, "users", uid), changes);
+    await loadAdminMembers();
+    setMessage("admin-message", "회원 권한을 변경했습니다.", "success");
+  } catch {
+    button.disabled = false;
+    button.textContent = originalText;
+    setMessage(
+      "admin-message",
+      "권한을 변경하지 못했습니다. 잠시 후 다시 시도해주세요.",
+      "error"
+    );
+  }
+}
+
+async function openAdminMembers() {
+  if (!isCurrentUserApprovedAdmin()) {
+    setMessage(
+      "login-message",
+      "관리자만 회원관리를 이용할 수 있습니다.",
+      "error"
+    );
+    showScreen("home-screen");
+    return;
+  }
+
+  showScreen("admin-members-screen");
+
+  try {
+    await loadAdminMembers();
+  } catch {
+    setMessage(
+      "admin-message",
+      "회원 목록을 불러오지 못했습니다. 다시 시도해주세요.",
+      "error"
+    );
+  }
+}
+
 const dailyMessages = [
   "오늘도 주님과 함께 걸어가요.",
   "오늘 하루도 예수님의 마음으로.",
@@ -381,6 +596,11 @@ onAuthStateChanged(auth, async (user) => {
   }
 
   if (!user) {
+    currentUserProfile = null;
+    const adminHomeButton = document.getElementById("admin-home-button");
+    if (adminHomeButton) {
+      adminHomeButton.hidden = true;
+    }
     showScreen("login-screen");
     return;
   }
@@ -403,5 +623,6 @@ window.showScreen = showScreen;
 window.login = login;
 window.signup = signup;
 window.logout = logout;
+window.openAdminMembers = openAdminMembers;
 
 export { auth, db };
