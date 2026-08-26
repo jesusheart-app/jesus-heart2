@@ -152,6 +152,12 @@
       font-weight: 700;
     }
 
+    .primary-button:disabled,
+    .secondary-button:disabled {
+      cursor: wait;
+      opacity: 0.58;
+    }
+
     .secondary-button {
       width: 100%;
       height: 52px;
@@ -175,6 +181,35 @@
       min-height: 24px;
       color: #8B6F5A;
       font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .start-message[data-type="error"] {
+      color: #A33F35;
+    }
+
+    .start-message[data-type="success"] {
+      color: #4E6B54;
+    }
+
+    .pending-box {
+      text-align: left;
+    }
+
+    .pending-name {
+      margin: 0 0 12px;
+      color: #4E6B54;
+      font-size: 21px;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .pending-description {
+      margin: 0 0 24px;
+      color: #71685F;
+      font-size: 16px;
+      line-height: 1.8;
+      text-align: center;
     }
 
     /* ========================================
@@ -240,6 +275,12 @@
       margin: 0;
       line-height: 1.7;
       font-size: 17px;
+    }
+
+    .welcome-name {
+      margin-bottom: 6px !important;
+      font-size: 20px !important;
+      font-weight: 700;
     }
 
     .menu-grid {
