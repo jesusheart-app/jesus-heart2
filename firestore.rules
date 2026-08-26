@@ -108,6 +108,26 @@ service cloud.firestore {
       allow delete: if isOwner(uid);
     }
 
+    match /users/{uid}/memoryChecks/{dateKey} {
+      allow read: if isOwner(uid);
+
+      allow create: if isOwner(uid)
+        && dateKey.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && request.resource.data.keys().hasOnly([
+          'uid',
+          'date',
+          'completed',
+          'createdAt'
+        ])
+        && request.resource.data.uid == uid
+        && request.resource.data.date == dateKey
+        && request.resource.data.completed == true
+        && request.resource.data.createdAt == request.time;
+
+      allow update: if false;
+      allow delete: if isOwner(uid);
+    }
+
     match /loginNames/{nameHash}/members/{uid} {
       allow read: if true;
 

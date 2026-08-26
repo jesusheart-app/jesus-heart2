@@ -648,6 +648,155 @@ async function toggleBibleCheck() {
   }
 }
 
+
+function getMemoryCheckReference(dateKey) {
+  return doc(
+    db,
+    "users",
+    auth.currentUser.uid,
+    "memoryChecks",
+    dateKey
+  );
+}
+
+function renderMemoryCheckState(isCompleted) {
+  const status = document.getElementById("memory-check-status");
+  const button = document.getElementById("memory-check-toggle-button");
+
+  status.textContent = isCompleted
+    ? "오늘 암송 완료를 기록했습니다."
+    : "오늘의 암송 기록이 아직 없습니다.";
+  status.dataset.completed = String(isCompleted);
+
+  button.dataset.completed = String(isCompleted);
+  button.textContent = isCompleted ? "오늘 기록 삭제" : "오늘 암송 완료";
+  button.className = isCompleted
+    ? "secondary-button"
+    : "primary-button";
+}
+
+function renderMemoryCheckHistory(documents) {
+  const list = document.getElementById("memory-check-history");
+  list.replaceChildren();
+
+  const records = documents
+    .filter((record) => record.data().completed === true)
+    .sort((first, second) => second.id.localeCompare(first.id));
+
+  if (records.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "memory-check-empty";
+    empty.textContent = "아직 암송을 기록한 날이 없습니다.";
+    list.append(empty);
+    return;
+  }
+
+  records.forEach((record) => {
+    const row = document.createElement("div");
+    row.className = "memory-check-history-row";
+
+    const date = document.createElement("span");
+    date.textContent = formatBibleCheckDate(record.id);
+
+    const state = document.createElement("span");
+    state.className = "memory-check-history-state";
+    state.textContent = "암송 완료";
+
+    row.append(date, state);
+    list.append(row);
+  });
+}
+
+async function loadMemoryChecks() {
+  const today = getTodayDateKey();
+  const [todaySnapshot, historySnapshot] = await Promise.all([
+    getDoc(getMemoryCheckReference(today)),
+    getDocs(
+      collection(db, "users", auth.currentUser.uid, "memoryChecks")
+    )
+  ]);
+
+  renderMemoryCheckState(
+    todaySnapshot.exists() &&
+    todaySnapshot.data().completed === true
+  );
+  renderMemoryCheckHistory(historySnapshot.docs);
+}
+
+async function openMemoryCheck() {
+  if (!auth.currentUser || currentUserProfile?.approved !== true) {
+    showScreen("login-screen", { historyMode: "replace" });
+    return;
+  }
+
+  showScreen("memory-screen");
+  setMessage("memory-check-message", "암송 기록을 불러오는 중입니다.");
+
+  try {
+    await loadMemoryChecks();
+    setMessage("memory-check-message", "");
+  } catch {
+    setMessage(
+      "memory-check-message",
+      "암송 기록을 불러오지 못했습니다. 다시 시도해주세요.",
+      "error"
+    );
+  }
+}
+
+async function toggleMemoryCheck() {
+  const button = document.getElementById("memory-check-toggle-button");
+  const isCompleted = button.dataset.completed === "true";
+
+  setMessage("memory-check-message", "");
+
+  if (!auth.currentUser || currentUserProfile?.approved !== true) {
+    showScreen("login-screen", { historyMode: "replace" });
+    return;
+  }
+
+  if (isCompleted && !window.confirm("정말 삭제하시겠습니까?")) {
+    return;
+  }
+
+  const originalButtonText = button.textContent;
+  button.disabled = true;
+  button.textContent = isCompleted ? "삭제 중..." : "저장 중...";
+
+  try {
+    const today = getTodayDateKey();
+    const reference = getMemoryCheckReference(today);
+
+    if (isCompleted) {
+      await deleteDoc(reference);
+    } else {
+      await setDoc(reference, {
+        uid: auth.currentUser.uid,
+        date: today,
+        completed: true,
+        createdAt: serverTimestamp()
+      });
+    }
+
+    await loadMemoryChecks();
+
+    setMessage(
+      "memory-check-message",
+      isCompleted ? "오늘의 암송 기록을 삭제했습니다." : "오늘의 암송을 기록했습니다.",
+      "success"
+    );
+  } catch {
+    button.textContent = originalButtonText;
+    setMessage(
+      "memory-check-message",
+      "암송 기록을 변경하지 못했습니다. 잠시 후 다시 시도해주세요.",
+      "error"
+    );
+  } finally {
+    button.disabled = false;
+  }
+}
+
 function isCurrentUserApprovedAdmin() {
   return Boolean(
     auth.currentUser &&
@@ -1031,5 +1180,7 @@ window.logout = logout;
 window.openAdminMembers = openAdminMembers;
 window.openBibleCheck = openBibleCheck;
 window.toggleBibleCheck = toggleBibleCheck;
+window.openMemoryCheck = openMemoryCheck;
+window.toggleMemoryCheck = toggleMemoryCheck;
 
 export { auth, db };

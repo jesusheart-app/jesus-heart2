@@ -361,7 +361,7 @@
 
           <button
             class="menu-button"
-            onclick="showScreen('memory-screen')"
+            onclick="openMemoryCheck()"
           >
             <span class="menu-icon">💛</span>
             <span class="menu-name">암송</span>
@@ -712,13 +712,13 @@
       </header>
 
 
-      <main class="page-content">
+      <main class="page-content memory-check-content">
 
-        <div class="page-card">
+        <div class="page-card memory-passage-card">
 
           <h2>2026년 암송 말씀</h2>
 
-          <p>
+          <p class="memory-passage">
             요한일서 4장 15절~21절
           </p>
 
@@ -730,8 +730,42 @@
           <h2>오늘도 암송을 하셨나요?</h2>
 
           <p>
-            암송을 마친 후 오늘의 암송을 체크해주세요.
+            성경을 보며 암송한 후 오늘의 완료를 기록해주세요.
           </p>
+
+          <p
+            id="memory-check-status"
+            class="memory-check-status"
+            aria-live="polite"
+          ></p>
+
+          <button
+            id="memory-check-toggle-button"
+            class="primary-button"
+            type="button"
+            data-completed="false"
+            onclick="toggleMemoryCheck()"
+          >
+            오늘 암송 완료
+          </button>
+
+          <div
+            id="memory-check-message"
+            class="start-message memory-check-message"
+            aria-live="polite"
+          ></div>
+
+        </div>
+
+
+        <div class="page-card">
+
+          <h2>나의 암송 기록</h2>
+
+          <div
+            id="memory-check-history"
+            class="memory-check-history"
+          ></div>
 
         </div>
 
