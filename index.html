@@ -334,7 +334,7 @@
 
           <button
             class="menu-button"
-            onclick="showScreen('prayer-screen')"
+            onclick="openPrayer()"
           >
             <span class="menu-icon">🙏</span>
             <span class="menu-name">기도</span>
@@ -618,17 +618,210 @@
       </header>
 
 
-      <main class="page-content">
+      <main class="page-content prayer-content">
 
-        <div class="page-card">
+        <div
+          class="prayer-tabs"
+          role="tablist"
+          aria-label="기도 공간 선택"
+        >
 
-          <h2>기도</h2>
+          <button
+            id="private-prayer-tab"
+            class="prayer-tab active"
+            type="button"
+            role="tab"
+            aria-selected="true"
+            onclick="showPrayerTab('private')"
+          >
+            나의 기도통장
+          </button>
 
-          <p>
-            오늘의 기도와 기도제목을 기록하는 공간입니다.
-          </p>
+          <button
+            id="community-prayer-tab"
+            class="prayer-tab"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            onclick="showPrayerTab('community')"
+          >
+            함께 기도해요
+          </button>
 
         </div>
+
+
+        <section id="private-prayer-panel" class="prayer-panel">
+
+          <div class="page-card">
+
+            <h2>나의 기도 기록</h2>
+
+            <p>
+              이곳의 기록은 본인만 볼 수 있습니다.
+            </p>
+
+            <div class="prayer-form">
+
+              <label for="private-prayer-title">
+                기도 제목
+              </label>
+
+              <input
+                id="private-prayer-title"
+                type="text"
+                maxlength="80"
+                placeholder="기도 제목을 입력하세요"
+              >
+
+              <label for="private-prayer-content">
+                기도 내용
+              </label>
+
+              <textarea
+                id="private-prayer-content"
+                maxlength="2000"
+                rows="6"
+                placeholder="기도 내용을 기록하세요"
+              ></textarea>
+
+              <button
+                id="private-prayer-save-button"
+                class="primary-button"
+                type="button"
+                onclick="savePrivatePrayer()"
+              >
+                기도 기록 저장
+              </button>
+
+              <button
+                id="private-prayer-cancel-button"
+                class="secondary-button prayer-cancel-button"
+                type="button"
+                onclick="resetPrivatePrayerForm()"
+                hidden
+              >
+                수정 취소
+              </button>
+
+              <div
+                id="private-prayer-message"
+                class="start-message prayer-form-message"
+                aria-live="polite"
+              ></div>
+
+            </div>
+
+          </div>
+
+
+          <div class="page-card">
+
+            <h2>나의 기도통장</h2>
+
+            <div
+              id="private-prayer-list"
+              class="prayer-record-list"
+            ></div>
+
+          </div>
+
+        </section>
+
+
+        <section
+          id="community-prayer-panel"
+          class="prayer-panel"
+          hidden
+        >
+
+          <div class="page-card">
+
+            <h2>공동체에 기도제목 나누기</h2>
+
+            <p>
+              승인된 교회 회원들과 함께 기도할 내용을 나눌 수 있습니다.
+            </p>
+
+            <div class="prayer-form">
+
+              <label for="community-prayer-author">
+                작성자 표시
+              </label>
+
+              <select id="community-prayer-author">
+                <option value="named">내 이름으로 나누기</option>
+                <option value="anonymous">익명으로 나누기</option>
+              </select>
+
+              <label for="community-prayer-title">
+                기도 제목
+              </label>
+
+              <input
+                id="community-prayer-title"
+                type="text"
+                maxlength="80"
+                placeholder="함께 기도할 제목을 입력하세요"
+              >
+
+              <label for="community-prayer-content">
+                기도 내용
+              </label>
+
+              <textarea
+                id="community-prayer-content"
+                maxlength="2000"
+                rows="6"
+                placeholder="함께 나눌 기도 내용을 입력하세요"
+              ></textarea>
+
+              <button
+                id="community-prayer-save-button"
+                class="primary-button"
+                type="button"
+                onclick="saveCommunityPrayer()"
+              >
+                기도제목 나누기
+              </button>
+
+              <button
+                id="community-prayer-cancel-button"
+                class="secondary-button prayer-cancel-button"
+                type="button"
+                onclick="resetCommunityPrayerForm()"
+                hidden
+              >
+                수정 취소
+              </button>
+
+              <div
+                id="community-prayer-message"
+                class="start-message prayer-form-message"
+                aria-live="polite"
+              ></div>
+
+            </div>
+
+          </div>
+
+
+          <div class="page-card">
+
+            <h2>함께 기도해요</h2>
+
+            <p class="prayer-list-guide">
+              최근 기도제목 20개를 보여드립니다.
+            </p>
+
+            <div
+              id="community-prayer-list"
+              class="prayer-record-list"
+            ></div>
+
+          </div>
+
+        </section>
 
       </main>
 

@@ -158,6 +158,138 @@ service cloud.firestore {
       allow delete: if isOwner(uid);
     }
 
+    match /users/{uid}/prayers/{prayerId} {
+      allow read: if isOwner(uid);
+
+      allow create: if isOwner(uid)
+        && request.resource.data.keys().hasOnly([
+          'uid',
+          'title',
+          'content',
+          'status',
+          'createdAt',
+          'updatedAt',
+          'answeredAt'
+        ])
+        && request.resource.data.uid == uid
+        && request.resource.data.title is string
+        && request.resource.data.title.size() >= 1
+        && request.resource.data.title.size() <= 80
+        && request.resource.data.content is string
+        && request.resource.data.content.size() >= 1
+        && request.resource.data.content.size() <= 2000
+        && request.resource.data.status == 'praying'
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.answeredAt == null;
+
+      allow update: if isOwner(uid)
+        && request.resource.data.keys().hasOnly([
+          'uid',
+          'title',
+          'content',
+          'status',
+          'createdAt',
+          'updatedAt',
+          'answeredAt'
+        ])
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.title is string
+        && request.resource.data.title.size() >= 1
+        && request.resource.data.title.size() <= 80
+        && request.resource.data.content is string
+        && request.resource.data.content.size() >= 1
+        && request.resource.data.content.size() <= 2000
+        && request.resource.data.status in ['praying', 'answered']
+        && request.resource.data.updatedAt == request.time
+        && (
+          (
+            request.resource.data.status == 'praying'
+            && request.resource.data.answeredAt == null
+          ) || (
+            request.resource.data.status == 'answered'
+            && request.resource.data.answeredAt is timestamp
+          )
+        );
+
+      allow delete: if isOwner(uid);
+    }
+
+    match /communityPrayers/{prayerId} {
+      allow read: if isApprovedMember();
+
+      allow create: if isApprovedMember()
+        && request.resource.data.keys().hasOnly([
+          'uid',
+          'title',
+          'content',
+          'isAnonymous',
+          'authorDisplay',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.title is string
+        && request.resource.data.title.size() >= 1
+        && request.resource.data.title.size() <= 80
+        && request.resource.data.content is string
+        && request.resource.data.content.size() >= 1
+        && request.resource.data.content.size() <= 2000
+        && request.resource.data.isAnonymous is bool
+        && (
+          (
+            request.resource.data.isAnonymous == true
+            && request.resource.data.authorDisplay == '익명'
+          ) || (
+            request.resource.data.isAnonymous == false
+            && request.resource.data.authorDisplay
+              == get(
+                /databases/$(database)/documents/users/$(request.auth.uid)
+              ).data.name
+          )
+        )
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+
+      allow update: if isApprovedMember()
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly([
+          'uid',
+          'title',
+          'content',
+          'isAnonymous',
+          'authorDisplay',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.title is string
+        && request.resource.data.title.size() >= 1
+        && request.resource.data.title.size() <= 80
+        && request.resource.data.content is string
+        && request.resource.data.content.size() >= 1
+        && request.resource.data.content.size() <= 2000
+        && request.resource.data.isAnonymous is bool
+        && (
+          (
+            request.resource.data.isAnonymous == true
+            && request.resource.data.authorDisplay == '익명'
+          ) || (
+            request.resource.data.isAnonymous == false
+            && request.resource.data.authorDisplay
+              == get(
+                /databases/$(database)/documents/users/$(request.auth.uid)
+              ).data.name
+          )
+        )
+        && request.resource.data.updatedAt == request.time;
+
+      allow delete: if signedIn()
+        && resource.data.uid == request.auth.uid;
+    }
+
     match /loginNames/{nameHash}/members/{uid} {
       allow read: if true;
 

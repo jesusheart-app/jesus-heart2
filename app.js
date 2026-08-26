@@ -16,6 +16,9 @@ import {
   getDoc,
   getDocs,
   getFirestore,
+  limit,
+  orderBy,
+  query,
   serverTimestamp,
   setDoc,
   updateDoc,
@@ -31,6 +34,10 @@ const persistenceReady = setPersistence(auth, browserLocalPersistence);
 
 let signupInProgress = false;
 let currentUserProfile = null;
+let privatePrayerCache = new Map();
+let communityPrayerCache = new Map();
+let editingPrivatePrayerId = null;
+let editingCommunityPrayerId = null;
 
 function showScreen(screenId, options = {}) {
   const target = document.getElementById(screenId);
@@ -882,6 +889,566 @@ async function toggleMemoryCheck() {
   }
 }
 
+
+function formatPrayerDate(timestamp) {
+  if (!timestamp || typeof timestamp.toDate !== "function") {
+    return "방금 전";
+  }
+
+  return timestamp.toDate().toLocaleDateString("ko-KR", {
+    year: "numeric",
+    month: "long",
+    day: "numeric"
+  });
+}
+
+function createPrayerActionButton(label, className, onClick) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = className;
+  button.textContent = label;
+  button.addEventListener("click", onClick);
+  return button;
+}
+
+function showPrayerTab(tabName) {
+  const privatePanel = document.getElementById("private-prayer-panel");
+  const communityPanel = document.getElementById("community-prayer-panel");
+  const privateTab = document.getElementById("private-prayer-tab");
+  const communityTab = document.getElementById("community-prayer-tab");
+  const showPrivate = tabName === "private";
+
+  privatePanel.hidden = !showPrivate;
+  communityPanel.hidden = showPrivate;
+  privateTab.classList.toggle("active", showPrivate);
+  communityTab.classList.toggle("active", !showPrivate);
+  privateTab.setAttribute("aria-selected", String(showPrivate));
+  communityTab.setAttribute("aria-selected", String(!showPrivate));
+}
+
+function resetPrivatePrayerForm() {
+  editingPrivatePrayerId = null;
+  document.getElementById("private-prayer-title").value = "";
+  document.getElementById("private-prayer-content").value = "";
+  document.getElementById("private-prayer-save-button").textContent =
+    "기도 기록 저장";
+  document.getElementById("private-prayer-cancel-button").hidden = true;
+  setMessage("private-prayer-message", "");
+}
+
+function renderPrivatePrayers(documents) {
+  const list = document.getElementById("private-prayer-list");
+  list.replaceChildren();
+  privatePrayerCache = new Map();
+
+  const prayers = documents
+    .map((prayerDocument) => ({
+      id: prayerDocument.id,
+      ...prayerDocument.data()
+    }))
+    .sort((first, second) => {
+      const firstTime = first.createdAt?.toMillis?.() || 0;
+      const secondTime = second.createdAt?.toMillis?.() || 0;
+      return secondTime - firstTime;
+    });
+
+  if (prayers.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "prayer-empty";
+    empty.textContent = "아직 기록한 기도가 없습니다.";
+    list.append(empty);
+    return;
+  }
+
+  prayers.forEach((prayer) => {
+    privatePrayerCache.set(prayer.id, prayer);
+
+    const card = document.createElement("article");
+    card.className = "prayer-record-card";
+
+    const heading = document.createElement("div");
+    heading.className = "prayer-record-heading";
+
+    const title = document.createElement("h3");
+    title.textContent = prayer.title;
+    heading.append(title);
+
+    const status = document.createElement("span");
+    status.className =
+      "prayer-status prayer-status-" + prayer.status;
+    status.textContent =
+      prayer.status === "answered" ? "응답받음" : "기도 중";
+    heading.append(status);
+    card.append(heading);
+
+    const content = document.createElement("p");
+    content.className = "prayer-record-content";
+    content.textContent = prayer.content;
+    card.append(content);
+
+    const date = document.createElement("p");
+    date.className = "prayer-record-date";
+    date.textContent = formatPrayerDate(prayer.createdAt);
+    card.append(date);
+
+    const actions = document.createElement("div");
+    actions.className = "prayer-record-actions";
+    actions.append(
+      createPrayerActionButton(
+        prayer.status === "answered" ? "다시 기도 중" : "응답받음",
+        "secondary-button prayer-small-button",
+        () => togglePrivatePrayerStatus(prayer.id)
+      ),
+      createPrayerActionButton(
+        "수정",
+        "secondary-button prayer-small-button",
+        () => editPrivatePrayer(prayer.id)
+      ),
+      createPrayerActionButton(
+        "삭제",
+        "secondary-button prayer-small-button prayer-delete-button",
+        () => deletePrivatePrayer(prayer.id)
+      )
+    );
+    card.append(actions);
+    list.append(card);
+  });
+}
+
+async function loadPrivatePrayers() {
+  const snapshot = await getDocs(
+    collection(db, "users", auth.currentUser.uid, "prayers")
+  );
+  renderPrivatePrayers(snapshot.docs);
+}
+
+async function savePrivatePrayer() {
+  const titleInput = document.getElementById("private-prayer-title");
+  const contentInput = document.getElementById("private-prayer-content");
+  const title = titleInput.value.trim();
+  const prayerContent = contentInput.value.trim();
+
+  setMessage("private-prayer-message", "");
+
+  if (!title || !prayerContent) {
+    setMessage(
+      "private-prayer-message",
+      "기도 제목과 내용을 모두 입력해주세요.",
+      "error"
+    );
+    return;
+  }
+
+  if (title.length > 80 || prayerContent.length > 2000) {
+    setMessage(
+      "private-prayer-message",
+      "기도 제목은 80자, 내용은 2,000자 이내로 입력해주세요.",
+      "error"
+    );
+    return;
+  }
+
+  const wasEditing = Boolean(editingPrivatePrayerId);
+
+  setBusy(
+    "private-prayer-save-button",
+    true,
+    "저장 중...",
+    wasEditing ? "기도 기록 수정" : "기도 기록 저장"
+  );
+
+  try {
+    if (editingPrivatePrayerId) {
+      const prayer = privatePrayerCache.get(editingPrivatePrayerId);
+      if (!prayer) {
+        throw new Error("Prayer not found");
+      }
+
+      await updateDoc(
+        doc(
+          db,
+          "users",
+          auth.currentUser.uid,
+          "prayers",
+          editingPrivatePrayerId
+        ),
+        {
+          title,
+          content: prayerContent,
+          updatedAt: serverTimestamp()
+        }
+      );
+    } else {
+      const reference = doc(
+        collection(db, "users", auth.currentUser.uid, "prayers")
+      );
+      await setDoc(reference, {
+        uid: auth.currentUser.uid,
+        title,
+        content: prayerContent,
+        status: "praying",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        answeredAt: null
+      });
+    }
+
+    resetPrivatePrayerForm();
+    await loadPrivatePrayers();
+    setMessage(
+      "private-prayer-message",
+      wasEditing ? "기도 기록을 수정했습니다." : "기도를 기록했습니다.",
+      "success"
+    );
+  } catch {
+    setMessage(
+      "private-prayer-message",
+      "기도 기록을 저장하지 못했습니다. 다시 시도해주세요.",
+      "error"
+    );
+  } finally {
+    const button = document.getElementById("private-prayer-save-button");
+    button.disabled = false;
+    button.textContent = editingPrivatePrayerId
+      ? "기도 기록 수정"
+      : "기도 기록 저장";
+  }
+}
+
+function editPrivatePrayer(prayerId) {
+  const prayer = privatePrayerCache.get(prayerId);
+  if (!prayer) {
+    return;
+  }
+
+  editingPrivatePrayerId = prayerId;
+  document.getElementById("private-prayer-title").value = prayer.title;
+  document.getElementById("private-prayer-content").value = prayer.content;
+  document.getElementById("private-prayer-save-button").textContent =
+    "기도 기록 수정";
+  document.getElementById("private-prayer-cancel-button").hidden = false;
+  setMessage("private-prayer-message", "수정할 내용을 확인해주세요.");
+  document.getElementById("private-prayer-title").focus();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+async function togglePrivatePrayerStatus(prayerId) {
+  const prayer = privatePrayerCache.get(prayerId);
+  if (!prayer) {
+    return;
+  }
+
+  const answered = prayer.status !== "answered";
+
+  try {
+    await updateDoc(
+      doc(db, "users", auth.currentUser.uid, "prayers", prayerId),
+      {
+        status: answered ? "answered" : "praying",
+        answeredAt: answered ? serverTimestamp() : null,
+        updatedAt: serverTimestamp()
+      }
+    );
+    await loadPrivatePrayers();
+  } catch {
+    setMessage(
+      "private-prayer-message",
+      "기도 상태를 변경하지 못했습니다.",
+      "error"
+    );
+  }
+}
+
+async function deletePrivatePrayer(prayerId) {
+  if (!window.confirm("정말 삭제하시겠습니까?")) {
+    return;
+  }
+
+  try {
+    await deleteDoc(
+      doc(db, "users", auth.currentUser.uid, "prayers", prayerId)
+    );
+    if (editingPrivatePrayerId === prayerId) {
+      resetPrivatePrayerForm();
+    }
+    await loadPrivatePrayers();
+    setMessage(
+      "private-prayer-message",
+      "기도 기록을 삭제했습니다.",
+      "success"
+    );
+  } catch {
+    setMessage(
+      "private-prayer-message",
+      "기도 기록을 삭제하지 못했습니다.",
+      "error"
+    );
+  }
+}
+
+function resetCommunityPrayerForm() {
+  editingCommunityPrayerId = null;
+  document.getElementById("community-prayer-title").value = "";
+  document.getElementById("community-prayer-content").value = "";
+  document.getElementById("community-prayer-author").value = "named";
+  document.getElementById("community-prayer-save-button").textContent =
+    "기도제목 나누기";
+  document.getElementById("community-prayer-cancel-button").hidden = true;
+  setMessage("community-prayer-message", "");
+}
+
+function renderCommunityPrayers(documents) {
+  const list = document.getElementById("community-prayer-list");
+  list.replaceChildren();
+  communityPrayerCache = new Map();
+
+  if (documents.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "prayer-empty";
+    empty.textContent = "아직 함께 나눈 기도제목이 없습니다.";
+    list.append(empty);
+    return;
+  }
+
+  documents.forEach((prayerDocument) => {
+    const prayer = {
+      id: prayerDocument.id,
+      ...prayerDocument.data()
+    };
+    communityPrayerCache.set(prayer.id, prayer);
+
+    const card = document.createElement("article");
+    card.className = "community-prayer-card";
+
+    const meta = document.createElement("p");
+    meta.className = "community-prayer-meta";
+    meta.textContent =
+      prayer.authorDisplay + " · " + formatPrayerDate(prayer.createdAt);
+    card.append(meta);
+
+    const title = document.createElement("h3");
+    title.textContent = prayer.title;
+    card.append(title);
+
+    const prayerContent = document.createElement("p");
+    prayerContent.className = "prayer-record-content";
+    prayerContent.textContent = prayer.content;
+    card.append(prayerContent);
+
+    if (prayer.uid === auth.currentUser?.uid) {
+      const actions = document.createElement("div");
+      actions.className = "prayer-record-actions";
+      actions.append(
+        createPrayerActionButton(
+          "수정",
+          "secondary-button prayer-small-button",
+          () => editCommunityPrayer(prayer.id)
+        ),
+        createPrayerActionButton(
+          "삭제",
+          "secondary-button prayer-small-button prayer-delete-button",
+          () => deleteCommunityPrayer(prayer.id)
+        )
+      );
+      card.append(actions);
+    }
+
+    const comingSoon = document.createElement("p");
+    comingSoon.className = "prayer-reaction-placeholder";
+    comingSoon.textContent =
+      "🙏 기도할게요 · ❤️ 마음을 보태요 · 🙌 아멘 · 댓글";
+    card.append(comingSoon);
+
+    list.append(card);
+  });
+}
+
+async function loadCommunityPrayers() {
+  const recentPrayers = query(
+    collection(db, "communityPrayers"),
+    orderBy("createdAt", "desc"),
+    limit(20)
+  );
+  const snapshot = await getDocs(recentPrayers);
+  renderCommunityPrayers(snapshot.docs);
+}
+
+async function saveCommunityPrayer() {
+  const title = document
+    .getElementById("community-prayer-title")
+    .value.trim();
+  const prayerContent = document
+    .getElementById("community-prayer-content")
+    .value.trim();
+  const isAnonymous =
+    document.getElementById("community-prayer-author").value ===
+    "anonymous";
+  const authorDisplay = isAnonymous
+    ? "익명"
+    : currentUserProfile.name;
+
+  setMessage("community-prayer-message", "");
+
+  if (!title || !prayerContent) {
+    setMessage(
+      "community-prayer-message",
+      "기도 제목과 내용을 모두 입력해주세요.",
+      "error"
+    );
+    return;
+  }
+
+  if (title.length > 80 || prayerContent.length > 2000) {
+    setMessage(
+      "community-prayer-message",
+      "기도 제목은 80자, 내용은 2,000자 이내로 입력해주세요.",
+      "error"
+    );
+    return;
+  }
+
+  const wasEditing = Boolean(editingCommunityPrayerId);
+
+  setBusy(
+    "community-prayer-save-button",
+    true,
+    "나누는 중...",
+    wasEditing ? "나눔 수정" : "기도제목 나누기"
+  );
+
+  try {
+    if (editingCommunityPrayerId) {
+      const prayer = communityPrayerCache.get(editingCommunityPrayerId);
+      if (!prayer || prayer.uid !== auth.currentUser.uid) {
+        throw new Error("Community prayer not found");
+      }
+
+      await updateDoc(
+        doc(db, "communityPrayers", editingCommunityPrayerId),
+        {
+          title,
+          content: prayerContent,
+          isAnonymous,
+          authorDisplay,
+          updatedAt: serverTimestamp()
+        }
+      );
+    } else {
+      const reference = doc(collection(db, "communityPrayers"));
+      await setDoc(reference, {
+        uid: auth.currentUser.uid,
+        title,
+        content: prayerContent,
+        isAnonymous,
+        authorDisplay,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+    }
+
+    resetCommunityPrayerForm();
+    await loadCommunityPrayers();
+    setMessage(
+      "community-prayer-message",
+      wasEditing
+        ? "기도 나눔을 수정했습니다."
+        : "기도제목을 함께 나눴습니다.",
+      "success"
+    );
+  } catch {
+    setMessage(
+      "community-prayer-message",
+      "기도제목을 저장하지 못했습니다. 다시 시도해주세요.",
+      "error"
+    );
+  } finally {
+    const button = document.getElementById(
+      "community-prayer-save-button"
+    );
+    button.disabled = false;
+    button.textContent = editingCommunityPrayerId
+      ? "나눔 수정"
+      : "기도제목 나누기";
+  }
+}
+
+function editCommunityPrayer(prayerId) {
+  const prayer = communityPrayerCache.get(prayerId);
+  if (!prayer || prayer.uid !== auth.currentUser?.uid) {
+    return;
+  }
+
+  editingCommunityPrayerId = prayerId;
+  document.getElementById("community-prayer-title").value =
+    prayer.title;
+  document.getElementById("community-prayer-content").value =
+    prayer.content;
+  document.getElementById("community-prayer-author").value =
+    prayer.isAnonymous ? "anonymous" : "named";
+  document.getElementById("community-prayer-save-button").textContent =
+    "나눔 수정";
+  document.getElementById("community-prayer-cancel-button").hidden =
+    false;
+  setMessage("community-prayer-message", "수정할 내용을 확인해주세요.");
+  document.getElementById("community-prayer-title").focus();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+async function deleteCommunityPrayer(prayerId) {
+  const prayer = communityPrayerCache.get(prayerId);
+  if (
+    !prayer ||
+    prayer.uid !== auth.currentUser?.uid ||
+    !window.confirm("정말 삭제하시겠습니까?")
+  ) {
+    return;
+  }
+
+  try {
+    await deleteDoc(doc(db, "communityPrayers", prayerId));
+    if (editingCommunityPrayerId === prayerId) {
+      resetCommunityPrayerForm();
+    }
+    await loadCommunityPrayers();
+    setMessage(
+      "community-prayer-message",
+      "기도 나눔을 삭제했습니다.",
+      "success"
+    );
+  } catch {
+    setMessage(
+      "community-prayer-message",
+      "기도 나눔을 삭제하지 못했습니다.",
+      "error"
+    );
+  }
+}
+
+async function openPrayer() {
+  if (!auth.currentUser || currentUserProfile?.approved !== true) {
+    showScreen("login-screen", { historyMode: "replace" });
+    return;
+  }
+
+  showScreen("prayer-screen");
+  showPrayerTab("private");
+  setMessage("private-prayer-message", "기도 기록을 불러오는 중입니다.");
+
+  try {
+    await Promise.all([
+      loadPrivatePrayers(),
+      loadCommunityPrayers()
+    ]);
+    setMessage("private-prayer-message", "");
+  } catch {
+    setMessage(
+      "private-prayer-message",
+      "기도 기록을 불러오지 못했습니다. 다시 시도해주세요.",
+      "error"
+    );
+  }
+}
+
 function isCurrentUserApprovedAdmin() {
   return Boolean(
     auth.currentUser &&
@@ -1267,5 +1834,11 @@ window.openBibleCheck = openBibleCheck;
 window.toggleBibleCheck = toggleBibleCheck;
 window.openMemoryCheck = openMemoryCheck;
 window.toggleMemoryCheck = toggleMemoryCheck;
+window.openPrayer = openPrayer;
+window.showPrayerTab = showPrayerTab;
+window.savePrivatePrayer = savePrivatePrayer;
+window.resetPrivatePrayerForm = resetPrivatePrayerForm;
+window.saveCommunityPrayer = saveCommunityPrayer;
+window.resetCommunityPrayerForm = resetCommunityPrayerForm;
 
 export { auth, db };
