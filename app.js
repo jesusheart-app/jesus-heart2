@@ -854,14 +854,87 @@ async function openAdminMembers() {
   }
 }
 
-const dailyMessages = [
-  "오늘도 주님과 함께 걸어가요.",
-  "오늘 하루도 예수님의 마음으로.",
-  "작은 믿음도 하나님께는 소중합니다.",
-  "오늘 받은 은혜를 마음에 담아보세요.",
-  "주님과 함께하는 오늘이 되기를 바랍니다.",
-  "오늘도 말씀 안에서 평안하세요."
+const greetingPeriods = [
+  {
+    key: "morning",
+    startHour: 5,
+    messages: [
+      "주님과 함께 새로운 하루를 시작해요.",
+      "오늘도 말씀 안에서 힘찬 하루 보내세요.",
+      "새 아침을 주신 주님께 감사하며 걸어가요.",
+      "주님의 사랑 안에서 기쁜 하루가 되기를 바라요.",
+      "오늘의 모든 걸음을 주님께 맡겨보세요.",
+      "맑은 아침처럼 마음에도 평안이 가득하기를 바라요.",
+      "작은 기도로 오늘 하루를 열어보세요.",
+      "오늘도 예수님의 마음을 품고 시작해요."
+    ]
+  },
+  {
+    key: "afternoon",
+    startHour: 12,
+    messages: [
+      "분주한 오후에도 잠시 주님 안에서 쉬어가세요.",
+      "남은 하루도 주님이 주시는 힘으로 걸어가요.",
+      "잠시 마음을 가다듬고 말씀을 떠올려보세요.",
+      "오늘의 수고 가운데에도 주님의 은혜가 함께해요.",
+      "따뜻한 마음으로 남은 하루를 이어가세요.",
+      "오후의 걸음에도 주님의 평안이 함께하기를 바라요.",
+      "작은 감사 하나를 떠올리며 힘을 내보세요.",
+      "주님 안에서 마음의 여유를 누리는 오후가 되세요."
+    ]
+  },
+  {
+    key: "evening",
+    startHour: 18,
+    messages: [
+      "오늘 하루 함께하신 주님의 은혜를 돌아보세요.",
+      "수고 많으셨어요. 주님 안에서 편안한 저녁 보내세요.",
+      "감사한 일을 하나씩 떠올리며 저녁을 맞이해요.",
+      "오늘의 기쁨과 어려움을 주님께 맡겨보세요.",
+      "사랑하는 이들과 따뜻한 저녁 보내세요.",
+      "하루의 끝자락에서도 주님의 평안을 누리세요.",
+      "오늘 받은 은혜를 마음에 곱게 담아보세요.",
+      "주님과 함께한 오늘을 감사로 마무리해요."
+    ]
+  },
+  {
+    key: "night",
+    startHour: 22,
+    messages: [
+      "오늘도 수고 많으셨어요. 주님 안에서 편히 쉬세요.",
+      "고요한 밤, 주님의 평안이 마음에 머물기를 바라요.",
+      "오늘의 모든 염려를 주님께 내려놓고 쉬어가세요.",
+      "주님의 사랑 안에서 평안한 밤 보내세요.",
+      "감사로 하루를 마치고 편안히 잠드세요.",
+      "내일의 걸음도 주님께 맡기며 쉬어가세요.",
+      "지친 마음까지 주님이 따뜻하게 안아주시기를 바라요.",
+      "오늘 함께하신 주님을 기억하며 평안히 쉬세요."
+    ]
+  }
 ];
+
+function getGreetingPeriod(hour) {
+  if (hour >= 22 || hour < 5) {
+    return greetingPeriods.find((period) => period.key === "night");
+  }
+
+  if (hour >= 18) {
+    return greetingPeriods.find((period) => period.key === "evening");
+  }
+
+  if (hour >= 12) {
+    return greetingPeriods.find((period) => period.key === "afternoon");
+  }
+
+  return greetingPeriods.find((period) => period.key === "morning");
+}
+
+function getGreetingDayNumber(date) {
+  return Math.floor(
+    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) /
+      (24 * 60 * 60 * 1000)
+  );
+}
 
 function setDailyMessage() {
   const messageElement = document.getElementById("daily-message");
@@ -869,8 +942,21 @@ function setDailyMessage() {
     return;
   }
 
-  const randomIndex = Math.floor(Math.random() * dailyMessages.length);
-  messageElement.textContent = dailyMessages[randomIndex];
+  const now = new Date();
+  const period = getGreetingPeriod(now.getHours());
+  const periodIndex = greetingPeriods.findIndex(
+    (candidate) => candidate.key === period.key
+  );
+  const messageIndex =
+    (getGreetingDayNumber(now) + periodIndex * 3) %
+    period.messages.length;
+
+  messageElement.textContent = period.messages[messageIndex];
+  messageElement.dataset.greetingPeriod = period.key;
+  messageElement.dataset.greetingDate =
+    now.getFullYear() + "-" +
+    String(now.getMonth() + 1).padStart(2, "0") + "-" +
+    String(now.getDate()).padStart(2, "0");
 }
 
 document.getElementById("login-password").addEventListener("keydown", (event) => {
@@ -929,6 +1015,13 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 setDailyMessage();
+
+setInterval(setDailyMessage, 60 * 1000);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") {
+    setDailyMessage();
+  }
+});
 
 window.showScreen = showScreen;
 window.goBackOrHome = goBackOrHome;
