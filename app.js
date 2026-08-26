@@ -534,6 +534,7 @@ async function toggleBibleCheck() {
     return;
   }
 
+  const originalButtonText = button.textContent;
   button.disabled = true;
   button.textContent = isChecked ? "삭제 중..." : "저장 중...";
 
@@ -563,6 +564,7 @@ async function toggleBibleCheck() {
       "success"
     );
   } catch {
+    button.textContent = originalButtonText;
     setMessage(
       "bible-check-message",
       "기록을 변경하지 못했습니다. 잠시 후 다시 시도해주세요.",
