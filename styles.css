@@ -337,6 +337,196 @@
     }
 
     /* ========================================
+       기도 기능 데이터 뼈대
+    ======================================== */
+
+    .prayer-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 18px;
+      padding: 6px;
+      border-radius: 18px;
+      background: #E9DFCE;
+    }
+
+    .prayer-tab {
+      min-height: 48px;
+      border: none;
+      border-radius: 14px;
+      background: transparent;
+      color: #655C52;
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .prayer-tab.active {
+      background: #FFFFFF;
+      color: #3F3A34;
+      box-shadow: 0 3px 10px rgba(70, 60, 50, 0.08);
+    }
+
+    .prayer-panel[hidden],
+    .prayer-cancel-button[hidden] {
+      display: none;
+    }
+
+    .prayer-form {
+      display: grid;
+      gap: 10px;
+      margin-top: 22px;
+    }
+
+    .prayer-form label {
+      margin-top: 4px;
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .prayer-form input,
+    .prayer-form textarea,
+    .prayer-form select {
+      width: 100%;
+      border: 1px solid #DDD5C9;
+      border-radius: 14px;
+      padding: 14px;
+      outline: none;
+      background: #FCFBF8;
+      color: #3F3A34;
+      font-size: 16px;
+    }
+
+    .prayer-form input,
+    .prayer-form select {
+      height: 54px;
+    }
+
+    .prayer-form textarea {
+      min-height: 130px;
+      resize: vertical;
+      line-height: 1.65;
+    }
+
+    .prayer-form input:focus,
+    .prayer-form textarea:focus,
+    .prayer-form select:focus {
+      border-color: #A99578;
+    }
+
+    .prayer-cancel-button {
+      margin-top: 2px;
+    }
+
+    .prayer-form-message {
+      margin-top: 2px;
+      text-align: left;
+    }
+
+    .prayer-record-list {
+      display: grid;
+      gap: 14px;
+      margin-top: 18px;
+    }
+
+    .prayer-record-card,
+    .community-prayer-card {
+      padding: 18px;
+      border: 1px solid #E5DED4;
+      border-radius: 18px;
+      background: #FCFBF8;
+    }
+
+    .prayer-record-heading {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .prayer-record-heading h3,
+    .community-prayer-card h3 {
+      margin: 0;
+      font-size: 18px;
+    }
+
+    .prayer-status {
+      flex: 0 0 auto;
+      padding: 5px 9px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .prayer-status-praying {
+      background: #F2E8D8;
+      color: #795D37;
+    }
+
+    .prayer-status-answered {
+      background: #E4EFE5;
+      color: #416046;
+    }
+
+    .prayer-record-content {
+      margin: 12px 0 0 !important;
+      color: #51483F !important;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .prayer-record-date,
+    .community-prayer-meta {
+      margin: 12px 0 0 !important;
+      color: #81786D !important;
+      font-size: 13px;
+    }
+
+    .community-prayer-meta {
+      margin: 0 0 8px !important;
+    }
+
+    .prayer-record-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 16px;
+    }
+
+    .prayer-small-button {
+      width: auto;
+      min-width: 90px;
+      height: 44px;
+      flex: 1 1 90px;
+      border-radius: 12px;
+      font-size: 14px;
+    }
+
+    .prayer-delete-button {
+      color: #91483F;
+    }
+
+    .prayer-empty {
+      margin: 0;
+      padding: 20px;
+      border-radius: 14px;
+      background: #F8F5EF;
+      color: #71685F;
+      text-align: center;
+    }
+
+    .prayer-list-guide {
+      margin-bottom: 0 !important;
+    }
+
+    .prayer-reaction-placeholder {
+      margin: 16px 0 0 !important;
+      padding-top: 14px;
+      border-top: 1px solid #E8E1D8;
+      color: #71685F !important;
+      font-size: 14px;
+    }
+
+    /* ========================================
        암송 체크 데이터 뼈대
     ======================================== */
 
