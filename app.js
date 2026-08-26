@@ -470,6 +470,79 @@ function getBibleCheckReference(dateKey) {
   );
 }
 
+function getCommunityBibleReference(dateKey) {
+  return doc(
+    db,
+    "communityBibleChecks",
+    dateKey,
+    "participants",
+    auth.currentUser.uid
+  );
+}
+
+function renderTodayCommunityBibleCount(count, currentUserCompleted) {
+  const message = document.getElementById("community-bible-message");
+  const sprouts = document.getElementById("community-bible-sprouts");
+  const memberName = currentUserProfile?.name || "회원";
+
+  if (currentUserCompleted) {
+    message.textContent =
+      memberName + "님까지 오늘 " + count + "명이 말씀을 읽었어요.";
+  } else if (count === 0) {
+    message.textContent =
+      "오늘은 아직 첫 말씀체크를 기다리고 있어요. " +
+      memberName + "님이 함께 시작해보세요.";
+  } else {
+    message.textContent =
+      "오늘 " + count + "명이 말씀과 함께했어요. " +
+      memberName + "님도 함께해요.";
+  }
+
+  sprouts.textContent =
+    count > 0 ? Array(Math.min(count, 20)).fill("🌱").join(" ") : "♡";
+  sprouts.setAttribute(
+    "aria-label",
+    "오늘 말씀을 읽은 사람 " + count + "명"
+  );
+}
+
+async function loadTodayCommunityBibleCount() {
+  const today = getTodayDateKey();
+  const personalReference = getBibleCheckReference(today);
+  const communityReference = getCommunityBibleReference(today);
+  const [personalSnapshot, communitySnapshot] = await Promise.all([
+    getDoc(personalReference),
+    getDoc(communityReference)
+  ]);
+  const currentUserCompleted =
+    personalSnapshot.exists() &&
+    personalSnapshot.data().checked === true;
+
+  if (currentUserCompleted && !communitySnapshot.exists()) {
+    await setDoc(communityReference, {
+      uid: auth.currentUser.uid,
+      date: today,
+      createdAt: serverTimestamp()
+    });
+  } else if (!currentUserCompleted && communitySnapshot.exists()) {
+    await deleteDoc(communityReference);
+  }
+
+  const participantsSnapshot = await getDocs(
+    collection(
+      db,
+      "communityBibleChecks",
+      today,
+      "participants"
+    )
+  );
+
+  renderTodayCommunityBibleCount(
+    participantsSnapshot.size,
+    currentUserCompleted
+  );
+}
+
 function renderBibleCheckSelection(dateKey, isChecked) {
   const status = document.getElementById("bible-check-status");
   const button = document.getElementById("bible-check-toggle-button");
@@ -574,7 +647,8 @@ async function openBibleCheck() {
   try {
     await Promise.all([
       loadBibleCheckForDate(),
-      loadBibleCheckHistory()
+      loadBibleCheckHistory(),
+      loadTodayCommunityBibleCount()
     ]);
     setMessage("bible-check-message", "");
   } catch {
@@ -613,22 +687,33 @@ async function toggleBibleCheck() {
 
   try {
     const reference = getBibleCheckReference(dateKey);
+    const communityReference = getCommunityBibleReference(dateKey);
+    const batch = writeBatch(db);
 
     if (isChecked) {
-      await deleteDoc(reference);
+      batch.delete(reference);
+      batch.delete(communityReference);
     } else {
-      await setDoc(reference, {
+      batch.set(reference, {
         uid: auth.currentUser.uid,
         date: dateKey,
         checked: true,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       });
+      batch.set(communityReference, {
+        uid: auth.currentUser.uid,
+        date: dateKey,
+        createdAt: serverTimestamp()
+      });
     }
+
+    await batch.commit();
 
     await Promise.all([
       loadBibleCheckForDate(),
-      loadBibleCheckHistory()
+      loadBibleCheckHistory(),
+      loadTodayCommunityBibleCount()
     ]);
 
     setMessage(
