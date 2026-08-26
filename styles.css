@@ -337,6 +337,135 @@
     }
 
     /* ========================================
+       관리자 회원관리 뼈대
+    ======================================== */
+
+    .admin-home-button {
+      width: 100%;
+      min-height: 64px;
+      margin-top: 14px;
+      border: 1px solid #CFC3B3;
+      border-radius: 18px;
+      background: #FFFFFF;
+      color: #51483F;
+      font-size: 17px;
+      font-weight: 700;
+    }
+
+    .admin-home-button[hidden] {
+      display: none;
+    }
+
+    .admin-members-content {
+      max-width: 760px;
+    }
+
+    .admin-summary-card {
+      margin-bottom: 0;
+    }
+
+    .admin-message {
+      margin: 12px 4px;
+      min-height: 24px;
+      text-align: left;
+    }
+
+    .admin-member-list {
+      display: grid;
+      gap: 14px;
+    }
+
+    .member-card {
+      padding: 22px;
+      border-radius: 20px;
+      background: #FFFFFF;
+      box-shadow: 0 5px 18px rgba(70, 60, 50, 0.06);
+    }
+
+    .member-card-heading {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .member-card-heading h2 {
+      margin: 0;
+      font-size: 20px;
+    }
+
+    .member-badges {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 6px;
+    }
+
+    .member-badge {
+      padding: 5px 9px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .member-badge-approved {
+      background: #E4EFE5;
+      color: #416046;
+    }
+
+    .member-badge-pending {
+      background: #F5E8D4;
+      color: #7A5A2F;
+    }
+
+    .member-badge-admin {
+      background: #E8E3F2;
+      color: #5E4E76;
+    }
+
+    .member-badge-member {
+      background: #EEEAE4;
+      color: #645C53;
+    }
+
+    .member-details {
+      margin: 12px 0 0;
+      color: #71685F;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .member-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .admin-action-button {
+      flex: 1;
+      width: auto;
+      height: 48px;
+      border-radius: 14px;
+      font-size: 15px;
+    }
+
+    .current-admin-note {
+      margin: 0;
+      color: #6E6256;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .admin-empty {
+      margin: 0;
+      padding: 28px;
+      border-radius: 20px;
+      background: #FFFFFF;
+      color: #71685F;
+      text-align: center;
+    }
+
+    /* ========================================
        일반 화면
     ======================================== */
 

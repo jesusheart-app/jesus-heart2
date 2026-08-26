@@ -386,6 +386,16 @@
           ⛪ 교회소식
         </button>
 
+        <button
+          id="admin-home-button"
+          class="admin-home-button"
+          type="button"
+          onclick="openAdminMembers()"
+          hidden
+        >
+          👥 회원관리
+        </button>
+
       </main>
 
 
@@ -422,6 +432,57 @@
         </div>
 
       </nav>
+
+    </section>
+
+
+
+
+    <!-- ======================================
+         관리자 회원관리
+    ======================================= -->
+
+    <section id="admin-members-screen" class="screen">
+
+      <header class="app-header">
+
+        <h1 class="header-title">
+          회원관리
+        </h1>
+
+        <button
+          class="header-button"
+          type="button"
+          onclick="showScreen('home-screen')"
+          aria-label="홈으로 돌아가기"
+        >
+          ←
+        </button>
+
+      </header>
+
+
+      <main class="page-content admin-members-content">
+
+        <div class="page-card admin-summary-card">
+
+          <h2>회원 승인과 권한 관리</h2>
+
+          <p id="admin-summary">
+            회원 목록을 불러오는 중입니다.
+          </p>
+
+        </div>
+
+        <div
+          id="admin-message"
+          class="start-message admin-message"
+          aria-live="polite"
+        ></div>
+
+        <div id="admin-member-list" class="admin-member-list"></div>
+
+      </main>
 
     </section>
 
