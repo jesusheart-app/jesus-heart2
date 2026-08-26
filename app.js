@@ -1048,11 +1048,13 @@ async function savePrivatePrayer() {
     return;
   }
 
+  const wasEditing = Boolean(editingPrivatePrayerId);
+
   setBusy(
     "private-prayer-save-button",
     true,
     "저장 중...",
-    editingPrivatePrayerId ? "기도 기록 수정" : "기도 기록 저장"
+    wasEditing ? "기도 기록 수정" : "기도 기록 저장"
   );
 
   try {
@@ -1095,7 +1097,7 @@ async function savePrivatePrayer() {
     await loadPrivatePrayers();
     setMessage(
       "private-prayer-message",
-      editingPrivatePrayerId ? "기도 기록을 수정했습니다." : "기도를 기록했습니다.",
+      wasEditing ? "기도 기록을 수정했습니다." : "기도를 기록했습니다.",
       "success"
     );
   } catch {
@@ -1305,11 +1307,13 @@ async function saveCommunityPrayer() {
     return;
   }
 
+  const wasEditing = Boolean(editingCommunityPrayerId);
+
   setBusy(
     "community-prayer-save-button",
     true,
     "나누는 중...",
-    editingCommunityPrayerId ? "나눔 수정" : "기도제목 나누기"
+    wasEditing ? "나눔 수정" : "기도제목 나누기"
   );
 
   try {
@@ -1346,7 +1350,7 @@ async function saveCommunityPrayer() {
     await loadCommunityPrayers();
     setMessage(
       "community-prayer-message",
-      editingCommunityPrayerId
+      wasEditing
         ? "기도 나눔을 수정했습니다."
         : "기도제목을 함께 나눴습니다.",
       "success"
