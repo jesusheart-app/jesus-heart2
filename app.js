@@ -32,19 +32,92 @@ const persistenceReady = setPersistence(auth, browserLocalPersistence);
 let signupInProgress = false;
 let currentUserProfile = null;
 
-function showScreen(screenId) {
+function showScreen(screenId, options = {}) {
+  const target = document.getElementById(screenId);
+  if (!target || !target.classList.contains("screen")) {
+    return;
+  }
+
+  const activeScreen = document.querySelector(".screen.active");
+  const historyMode = options.historyMode || "push";
+
   document.querySelectorAll(".screen").forEach((screen) => {
     screen.classList.remove("active");
   });
 
-  const target = document.getElementById(screenId);
-  if (!target) {
+  target.classList.add("active");
+
+  if (historyMode === "push" && activeScreen?.id !== screenId) {
+    history.pushState({ screenId }, "", window.location.href);
+  } else if (historyMode === "replace") {
+    history.replaceState({ screenId }, "", window.location.href);
+  }
+
+  window.scrollTo({ top: 0, behavior: "auto" });
+}
+
+function getSafeHistoryScreen(requestedScreenId) {
+  const requestedScreen = document.getElementById(requestedScreenId);
+  const screenExists = requestedScreen?.classList.contains("screen");
+
+  if (!auth.currentUser) {
+    return requestedScreenId === "signup-screen" && screenExists
+      ? "signup-screen"
+      : "login-screen";
+  }
+
+  if (currentUserProfile?.approved !== true) {
+    return "pending-screen";
+  }
+
+  if (
+    requestedScreenId === "admin-members-screen" &&
+    currentUserProfile.role !== "admin"
+  ) {
+    return "home-screen";
+  }
+
+  if (
+    !screenExists ||
+    ["login-screen", "signup-screen", "pending-screen"].includes(
+      requestedScreenId
+    )
+  ) {
+    return "home-screen";
+  }
+
+  return requestedScreenId;
+}
+
+function goBackOrHome() {
+  const activeScreen = document.querySelector(".screen.active");
+
+  if (
+    activeScreen &&
+    activeScreen.id !== "home-screen" &&
+    history.state?.screenId === activeScreen.id
+  ) {
+    history.back();
     return;
   }
 
-  target.classList.add("active");
-  window.scrollTo({ top: 0, behavior: "auto" });
+  showScreen("home-screen", { historyMode: "replace" });
 }
+
+window.addEventListener("popstate", (event) => {
+  const requestedScreenId = event.state?.screenId;
+  const safeScreenId = getSafeHistoryScreen(requestedScreenId);
+  const historyMode =
+    requestedScreenId === safeScreenId ? "none" : "replace";
+
+  showScreen(safeScreenId, { historyMode });
+});
+
+history.replaceState(
+  { screenId: "login-screen" },
+  "",
+  window.location.href
+);
 
 function setMessage(elementId, text, type = "") {
   const element = document.getElementById(elementId);
@@ -134,7 +207,7 @@ async function routeAuthenticatedUser(user) {
       "회원 정보를 찾을 수 없습니다. 관리자에게 문의해주세요.",
       "error"
     );
-    showScreen("login-screen");
+    showScreen("login-screen", { historyMode: "replace" });
     return;
   }
 
@@ -149,13 +222,13 @@ async function routeAuthenticatedUser(user) {
   if (!profile.approved) {
     document.getElementById("pending-name").textContent =
       `${profile.name}님의 가입 승인을 기다리고 있습니다.`;
-    showScreen("pending-screen");
+    showScreen("pending-screen", { historyMode: "replace" });
     return;
   }
 
   document.getElementById("welcome-name").textContent =
     `${profile.name}님, 반갑습니다.`;
-  showScreen("home-screen");
+  showScreen("home-screen", { historyMode: "replace" });
 }
 
 async function login() {
@@ -325,7 +398,7 @@ async function signup() {
 
     document.getElementById("pending-name").textContent =
       `${name}님의 가입 신청이 접수되었습니다.`;
-    showScreen("pending-screen");
+    showScreen("pending-screen", { historyMode: "replace" });
   } catch (error) {
     if (createdUser) {
       try {
@@ -348,7 +421,7 @@ async function logout() {
   } finally {
     document.getElementById("login-password").value = "";
     setMessage("login-message", "");
-    showScreen("login-screen");
+    showScreen("login-screen", { historyMode: "replace" });
   }
 }
 
@@ -483,7 +556,7 @@ async function loadBibleCheckHistory() {
 
 async function openBibleCheck() {
   if (!auth.currentUser || currentUserProfile?.approved !== true) {
-    showScreen("login-screen");
+    showScreen("login-screen", { historyMode: "replace" });
     return;
   }
 
@@ -718,7 +791,7 @@ function renderAdminMembers(memberDocuments) {
 
 async function loadAdminMembers() {
   if (!isCurrentUserApprovedAdmin()) {
-    showScreen("home-screen");
+    showScreen("home-screen", { historyMode: "replace" });
     return;
   }
 
@@ -764,7 +837,7 @@ async function openAdminMembers() {
       "관리자만 회원관리를 이용할 수 있습니다.",
       "error"
     );
-    showScreen("home-screen");
+    showScreen("home-screen", { historyMode: "replace" });
     return;
   }
 
@@ -839,7 +912,7 @@ onAuthStateChanged(auth, async (user) => {
     if (adminHomeButton) {
       adminHomeButton.hidden = true;
     }
-    showScreen("login-screen");
+    showScreen("login-screen", { historyMode: "replace" });
     return;
   }
 
@@ -851,13 +924,14 @@ onAuthStateChanged(auth, async (user) => {
       "회원 상태를 확인하지 못했습니다. 다시 로그인해주세요.",
       "error"
     );
-    showScreen("login-screen");
+    showScreen("login-screen", { historyMode: "replace" });
   }
 });
 
 setDailyMessage();
 
 window.showScreen = showScreen;
+window.goBackOrHome = goBackOrHome;
 window.login = login;
 window.signup = signup;
 window.logout = logout;
