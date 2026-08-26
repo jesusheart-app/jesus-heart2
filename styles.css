@@ -402,6 +402,25 @@
        말씀체크 데이터 뼈대
     ======================================== */
 
+    .community-bible-card {
+      background: #F0E8D9;
+    }
+
+    .community-bible-message {
+      color: #51483F !important;
+      font-size: 17px;
+      font-weight: 600;
+    }
+
+    .community-bible-sprouts {
+      min-height: 34px;
+      margin-top: 16px;
+      color: #4E6B54;
+      font-size: 22px;
+      line-height: 1.5;
+      letter-spacing: 2px;
+    }
+
     .bible-check-form {
       margin-top: 22px;
     }
