@@ -90,45 +90,7 @@ service cloud.firestore {
       allow read: if isOwner(uid);
 
       allow create: if isOwner(uid)
-        && dateKey.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}
-      allow read: if true;
-
-      allow create: if isOwner(uid)
-        && request.resource.data.keys().hasOnly([
-          'uid',
-          'email',
-          'memberId',
-          'nameHash',
-          'createdAt'
-        ])
-        && request.resource.data.uid == uid
-        && request.resource.data.email == request.auth.token.email
-        && request.resource.data.memberId.matches('^[A-HJ-NP-Z2-9]{6}$')
-        && request.resource.data.nameHash == nameHash
-        && request.resource.data.nameHash.size() == 64
-        && request.resource.data.createdAt == request.time;
-
-      allow update: if false;
-      allow delete: if isOwner(uid) || isApprovedAdmin();
-    }
-
-    match /memberIds/{memberId} {
-      allow create: if signedIn()
-        && request.resource.data.keys().hasOnly(['uid', 'createdAt'])
-        && request.resource.data.uid == request.auth.uid
-        && memberId.matches('^[A-HJ-NP-Z2-9]{6}$')
-        && request.resource.data.createdAt == request.time;
-
-      allow read, update: if isApprovedAdmin();
-      allow delete: if isApprovedAdmin();
-    }
-
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-}
-)
+        && dateKey.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
         && request.resource.data.keys().hasOnly([
           'uid',
           'date',
