@@ -23,6 +23,76 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
+    function hadPrayerReaction(prayerId, uid) {
+      return exists(
+          /databases/$(database)/documents/communityPrayers/$(prayerId)/privateReactions/$(uid)
+        )
+        && get(
+          /databases/$(database)/documents/communityPrayers/$(prayerId)/privateReactions/$(uid)
+        ).data.prayer == true;
+    }
+
+    function hadHeartReaction(prayerId, uid) {
+      return exists(
+          /databases/$(database)/documents/communityPrayers/$(prayerId)/privateReactions/$(uid)
+        )
+        && get(
+          /databases/$(database)/documents/communityPrayers/$(prayerId)/privateReactions/$(uid)
+        ).data.heart == true;
+    }
+
+    function hadAmenReaction(prayerId, uid) {
+      return exists(
+          /databases/$(database)/documents/communityPrayers/$(prayerId)/privateReactions/$(uid)
+        )
+        && get(
+          /databases/$(database)/documents/communityPrayers/$(prayerId)/privateReactions/$(uid)
+        ).data.amen == true;
+    }
+
+    function willHavePrayerReaction(prayerId, uid) {
+      return getAfter(
+        /databases/$(database)/documents/communityPrayers/$(prayerId)/privateReactions/$(uid)
+      ).data.prayer == true;
+    }
+
+    function willHaveHeartReaction(prayerId, uid) {
+      return getAfter(
+        /databases/$(database)/documents/communityPrayers/$(prayerId)/privateReactions/$(uid)
+      ).data.heart == true;
+    }
+
+    function willHaveAmenReaction(prayerId, uid) {
+      return getAfter(
+        /databases/$(database)/documents/communityPrayers/$(prayerId)/privateReactions/$(uid)
+      ).data.amen == true;
+    }
+
+    function validReactionCounts(prayer) {
+      return prayer.reactionPrayerCount is int
+        && prayer.reactionPrayerCount >= 0
+        && prayer.reactionHeartCount is int
+        && prayer.reactionHeartCount >= 0
+        && prayer.reactionAmenCount is int
+        && prayer.reactionAmenCount >= 0;
+    }
+
+    function hasValidReactionCountChange(prayerId, uid) {
+      return validReactionCounts(request.resource.data)
+        && request.resource.data.reactionPrayerCount
+          == resource.data.get('reactionPrayerCount', 0)
+            + (willHavePrayerReaction(prayerId, uid) ? 1 : 0)
+            - (hadPrayerReaction(prayerId, uid) ? 1 : 0)
+        && request.resource.data.reactionHeartCount
+          == resource.data.get('reactionHeartCount', 0)
+            + (willHaveHeartReaction(prayerId, uid) ? 1 : 0)
+            - (hadHeartReaction(prayerId, uid) ? 1 : 0)
+        && request.resource.data.reactionAmenCount
+          == resource.data.get('reactionAmenCount', 0)
+            + (willHaveAmenReaction(prayerId, uid) ? 1 : 0)
+            - (hadAmenReaction(prayerId, uid) ? 1 : 0);
+    }
+
     function hasValidSettings(settings) {
       return settings.keys().hasOnly(['fontSize', 'notifications'])
         && settings.fontSize in ['small', 'normal', 'large', 'extra-large']
@@ -226,6 +296,9 @@ service cloud.firestore {
           'content',
           'isAnonymous',
           'authorDisplay',
+          'reactionPrayerCount',
+          'reactionHeartCount',
+          'reactionAmenCount',
           'createdAt',
           'updatedAt'
         ])
@@ -249,45 +322,122 @@ service cloud.firestore {
               ).data.name
           )
         )
+        && request.resource.data.reactionPrayerCount == 0
+        && request.resource.data.reactionHeartCount == 0
+        && request.resource.data.reactionAmenCount == 0
         && request.resource.data.createdAt == request.time
         && request.resource.data.updatedAt == request.time;
 
-      allow update: if isApprovedMember()
-        && resource.data.uid == request.auth.uid
-        && request.resource.data.keys().hasOnly([
-          'uid',
-          'title',
-          'content',
-          'isAnonymous',
-          'authorDisplay',
-          'createdAt',
-          'updatedAt'
-        ])
-        && request.resource.data.uid == resource.data.uid
-        && request.resource.data.createdAt == resource.data.createdAt
-        && request.resource.data.title is string
-        && request.resource.data.title.size() >= 1
-        && request.resource.data.title.size() <= 80
-        && request.resource.data.content is string
-        && request.resource.data.content.size() >= 1
-        && request.resource.data.content.size() <= 2000
-        && request.resource.data.isAnonymous is bool
-        && (
-          (
-            request.resource.data.isAnonymous == true
-            && request.resource.data.authorDisplay == '익명'
-          ) || (
-            request.resource.data.isAnonymous == false
-            && request.resource.data.authorDisplay
-              == get(
-                /databases/$(database)/documents/users/$(request.auth.uid)
-              ).data.name
+      allow update: if (
+          isApprovedMember()
+          && resource.data.uid == request.auth.uid
+          && request.resource.data.keys().hasOnly([
+            'uid',
+            'title',
+            'content',
+            'isAnonymous',
+            'authorDisplay',
+            'reactionPrayerCount',
+            'reactionHeartCount',
+            'reactionAmenCount',
+            'createdAt',
+            'updatedAt'
+          ])
+          && request.resource.data.uid == resource.data.uid
+          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.get('reactionPrayerCount', 0)
+            == resource.data.get('reactionPrayerCount', 0)
+          && request.resource.data.get('reactionHeartCount', 0)
+            == resource.data.get('reactionHeartCount', 0)
+          && request.resource.data.get('reactionAmenCount', 0)
+            == resource.data.get('reactionAmenCount', 0)
+          && request.resource.data.title is string
+          && request.resource.data.title.size() >= 1
+          && request.resource.data.title.size() <= 80
+          && request.resource.data.content is string
+          && request.resource.data.content.size() >= 1
+          && request.resource.data.content.size() <= 2000
+          && request.resource.data.isAnonymous is bool
+          && (
+            (
+              request.resource.data.isAnonymous == true
+              && request.resource.data.authorDisplay == '익명'
+            ) || (
+              request.resource.data.isAnonymous == false
+              && request.resource.data.authorDisplay
+                == get(
+                  /databases/$(database)/documents/users/$(request.auth.uid)
+                ).data.name
+            )
           )
-        )
-        && request.resource.data.updatedAt == request.time;
+          && request.resource.data.updatedAt == request.time
+        ) || (
+          isApprovedMember()
+          && resource.data.uid != request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly([
+              'reactionPrayerCount',
+              'reactionHeartCount',
+              'reactionAmenCount'
+            ])
+          && hasValidReactionCountChange(prayerId, request.auth.uid)
+        );
 
       allow delete: if signedIn()
         && resource.data.uid == request.auth.uid;
+    }
+
+    match /communityPrayers/{prayerId}/privateReactions/{uid} {
+      allow read: if isOwner(uid)
+        && isApprovedMember()
+        && exists(
+          /databases/$(database)/documents/communityPrayers/$(prayerId)
+        );
+
+      allow create, update: if isOwner(uid)
+        && isApprovedMember()
+        && exists(
+          /databases/$(database)/documents/communityPrayers/$(prayerId)
+        )
+        && get(
+          /databases/$(database)/documents/communityPrayers/$(prayerId)
+        ).data.uid != request.auth.uid
+        && request.resource.data.keys().hasOnly([
+          'prayer',
+          'heart',
+          'amen',
+          'updatedAt'
+        ])
+        && request.resource.data.prayer is bool
+        && request.resource.data.heart is bool
+        && request.resource.data.amen is bool
+        && request.resource.data.updatedAt == request.time
+        && getAfter(
+          /databases/$(database)/documents/communityPrayers/$(prayerId)
+        ).data.reactionPrayerCount
+          == get(
+            /databases/$(database)/documents/communityPrayers/$(prayerId)
+          ).data.get('reactionPrayerCount', 0)
+            + (request.resource.data.prayer == true ? 1 : 0)
+            - (hadPrayerReaction(prayerId, uid) ? 1 : 0)
+        && getAfter(
+          /databases/$(database)/documents/communityPrayers/$(prayerId)
+        ).data.reactionHeartCount
+          == get(
+            /databases/$(database)/documents/communityPrayers/$(prayerId)
+          ).data.get('reactionHeartCount', 0)
+            + (request.resource.data.heart == true ? 1 : 0)
+            - (hadHeartReaction(prayerId, uid) ? 1 : 0)
+        && getAfter(
+          /databases/$(database)/documents/communityPrayers/$(prayerId)
+        ).data.reactionAmenCount
+          == get(
+            /databases/$(database)/documents/communityPrayers/$(prayerId)
+          ).data.get('reactionAmenCount', 0)
+            + (request.resource.data.amen == true ? 1 : 0)
+            - (hadAmenReaction(prayerId, uid) ? 1 : 0);
+
+      allow delete: if false;
     }
 
     match /loginNames/{nameHash}/members/{uid} {

@@ -518,12 +518,43 @@
       margin-bottom: 0 !important;
     }
 
-    .prayer-reaction-placeholder {
-      margin: 16px 0 0 !important;
+    .prayer-reactions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 16px;
       padding-top: 14px;
       border-top: 1px solid #E8E1D8;
-      color: #71685F !important;
-      font-size: 14px;
+    }
+
+    .prayer-reaction-button {
+      min-height: 42px;
+      padding: 9px 12px;
+      border: 1px solid #DDD3C7;
+      border-radius: 999px;
+      background: #FCFBF8;
+      color: #51483F;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .prayer-reaction-button.active {
+      border-color: #B99B72;
+      background: #F2E8D8;
+      color: #674E2F;
+    }
+
+    .prayer-reaction-button:disabled {
+      cursor: default;
+      opacity: 0.58;
+    }
+
+    .prayer-reaction-guide {
+      flex-basis: 100%;
+      margin: 2px 0 0 !important;
+      color: #81786D !important;
+      font-size: 13px;
     }
 
     /* ========================================

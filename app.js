@@ -19,6 +19,7 @@ import {
   limit,
   orderBy,
   query,
+  runTransaction,
   serverTimestamp,
   setDoc,
   updateDoc,
@@ -38,6 +39,12 @@ let privatePrayerCache = new Map();
 let communityPrayerCache = new Map();
 let editingPrivatePrayerId = null;
 let editingCommunityPrayerId = null;
+
+const communityPrayerReactionTypes = [
+  { key: "prayer", countField: "reactionPrayerCount", emoji: "🙏", label: "기도할게요" },
+  { key: "heart", countField: "reactionHeartCount", emoji: "❤️", label: "마음을 보태요" },
+  { key: "amen", countField: "reactionAmenCount", emoji: "🙌", label: "아멘" }
+];
 
 function showScreen(screenId, options = {}) {
   const target = document.getElementById(screenId);
@@ -1197,6 +1204,127 @@ function resetCommunityPrayerForm() {
   setMessage("community-prayer-message", "");
 }
 
+async function toggleCommunityPrayerReaction(prayer, reactionType) {
+  if (!auth.currentUser || prayer.uid === auth.currentUser.uid) {
+    return;
+  }
+
+  const prayerReference = doc(db, "communityPrayers", prayer.id);
+  const reactionReference = doc(
+    db, "communityPrayers", prayer.id, "privateReactions", auth.currentUser.uid
+  );
+
+  await runTransaction(db, async (transaction) => {
+    const prayerSnapshot = await transaction.get(prayerReference);
+    const reactionSnapshot = await transaction.get(reactionReference);
+
+    if (!prayerSnapshot.exists()) {
+      throw new Error("Community prayer not found");
+    }
+
+    const prayerData = prayerSnapshot.data();
+    if (prayerData.uid === auth.currentUser.uid) {
+      throw new Error("Authors cannot react to their own prayer");
+    }
+
+    const current = reactionSnapshot.exists()
+      ? reactionSnapshot.data()
+      : { prayer: false, heart: false, amen: false };
+    const next = {
+      prayer: current.prayer === true,
+      heart: current.heart === true,
+      amen: current.amen === true
+    };
+    const wasSelected = next[reactionType.key];
+    next[reactionType.key] = !wasSelected;
+
+    const nextCounts = {
+      reactionPrayerCount: Number(prayerData.reactionPrayerCount || 0),
+      reactionHeartCount: Number(prayerData.reactionHeartCount || 0),
+      reactionAmenCount: Number(prayerData.reactionAmenCount || 0)
+    };
+    nextCounts[reactionType.countField] += wasSelected ? -1 : 1;
+
+    if (nextCounts[reactionType.countField] < 0) {
+      throw new Error("Invalid reaction count");
+    }
+
+    transaction.update(prayerReference, nextCounts);
+    transaction.set(reactionReference, {
+      ...next,
+      updatedAt: serverTimestamp()
+    });
+  });
+}
+
+async function renderCommunityPrayerReactions(prayer, container) {
+  container.textContent = "반응을 불러오는 중입니다.";
+
+  try {
+    const reactionSnapshot = await getDoc(
+      doc(
+        db,
+        "communityPrayers",
+        prayer.id,
+        "privateReactions",
+        auth.currentUser.uid
+      )
+    );
+    const mine = reactionSnapshot.exists()
+      ? reactionSnapshot.data()
+      : { prayer: false, heart: false, amen: false };
+    const isAuthor = prayer.uid === auth.currentUser?.uid;
+
+    container.replaceChildren();
+
+    communityPrayerReactionTypes.forEach((reactionType) => {
+      const { key, countField, emoji, label } = reactionType;
+      const count = Number(prayer[countField] || 0);
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "prayer-reaction-button";
+      button.textContent = emoji + " " + label + (count ? " " + count : "");
+      button.disabled = isAuthor;
+      button.setAttribute("aria-pressed", mine[key] === true ? "true" : "false");
+
+      if (mine[key] === true) {
+        button.classList.add("active");
+      }
+
+      if (isAuthor) {
+        button.title = "작성자는 자신의 기도제목에 반응할 수 없습니다.";
+      } else {
+        button.addEventListener("click", async () => {
+          button.disabled = true;
+          try {
+            await toggleCommunityPrayerReaction(prayer, reactionType);
+            await loadCommunityPrayers();
+          } catch {
+            button.disabled = false;
+            setMessage(
+              "community-prayer-message",
+              "반응을 저장하지 못했습니다. 다시 시도해주세요.",
+              "error"
+            );
+          }
+        });
+      }
+
+      container.append(button);
+    });
+
+    if (isAuthor) {
+      const guide = document.createElement("p");
+      guide.className = "prayer-reaction-guide";
+      guide.textContent =
+        "다른 회원들이 이 기도제목에 함께 마음을 모을 수 있어요.";
+      container.append(guide);
+    }
+  } catch {
+    container.textContent = "반응을 불러오지 못했습니다.";
+  }
+}
+
 function renderCommunityPrayers(documents) {
   const list = document.getElementById("community-prayer-list");
   list.replaceChildren();
@@ -1253,12 +1381,11 @@ function renderCommunityPrayers(documents) {
       card.append(actions);
     }
 
-    const comingSoon = document.createElement("p");
-    comingSoon.className = "prayer-reaction-placeholder";
-    comingSoon.textContent =
-      "🙏 기도할게요 · ❤️ 마음을 보태요 · 🙌 아멘 · 댓글";
-    card.append(comingSoon);
+    const reactions = document.createElement("div");
+    reactions.className = "prayer-reactions";
+    card.append(reactions);
 
+    renderCommunityPrayerReactions(prayer, reactions);
     list.append(card);
   });
 }
@@ -1341,6 +1468,9 @@ async function saveCommunityPrayer() {
         content: prayerContent,
         isAnonymous,
         authorDisplay,
+        reactionPrayerCount: 0,
+        reactionHeartCount: 0,
+        reactionAmenCount: 0,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       });
