@@ -1347,3 +1347,10 @@
       color: #71685F;
       text-align: center;
     }
+
+    .word-room-invite-form, .word-room-member-list { display: grid; gap: 10px; margin-top: 16px; }
+    .word-room-invite-form select { width: 100%; min-height: 50px; padding: 12px 14px; border: 1px solid #DDD3C7; border-radius: 14px; background: #FCFBF8; color: #443C34; font: inherit; }
+    .word-room-member-row { display: grid; gap: 10px; padding: 14px; border: 1px solid #E5DDD2; border-radius: 14px; background: #FCFBF8; }
+    .word-room-member-role { display: inline-block; margin-left: 8px; color: #81786D; font-size: 13px; font-weight: 700; }
+    .word-room-member-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .word-room-member-button { min-height: 42px; margin: 0; padding: 8px; font-size: 13px; }

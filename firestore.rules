@@ -235,6 +235,18 @@ service cloud.firestore {
       allow delete: if isApprovedAdmin();
     }
 
+    match /memberDirectory/{uid} {
+      allow read: if isApprovedMember();
+      allow create, update: if isOwner(uid)
+        && isApprovedMember()
+        && request.resource.data.keys().hasOnly(['uid', 'name', 'updatedAt'])
+        && request.resource.data.uid == uid
+        && request.resource.data.name
+          == get(/databases/$(database)/documents/users/$(uid)).data.name
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if isOwner(uid) || isApprovedAdmin();
+    }
+
     match /users/{uid}/bibleChecks/{dateKey} {
       allow read: if isOwner(uid);
 
@@ -869,15 +881,18 @@ service cloud.firestore {
           'updatedAt'
         ])
         && request.resource.data.createdBy == resource.data.createdBy
-        && request.resource.data.leaderUid == resource.data.leaderUid
-        && request.resource.data.leaderName == resource.data.leaderName
-        && request.resource.data.memberUids == resource.data.memberUids
         && request.resource.data.createdAt == resource.data.createdAt
         && request.resource.data.name is string
         && request.resource.data.name.size() >= 1
         && request.resource.data.name.size() <= 60
         && request.resource.data.description is string
         && request.resource.data.description.size() <= 500
+        && request.resource.data.memberUids is list
+        && request.resource.data.memberUids.size() >= 1
+        && request.resource.data.leaderUid in request.resource.data.memberUids
+        && get(/databases/$(database)/documents/users/$(request.resource.data.leaderUid)).data.approved == true
+        && request.resource.data.leaderName
+          == get(/databases/$(database)/documents/users/$(request.resource.data.leaderUid)).data.name
         && request.resource.data.updatedAt == request.time;
 
       allow delete: if isApprovedMember()
@@ -901,11 +916,13 @@ service cloud.firestore {
           )
         );
 
-      allow create: if isOwner(uid)
-        && isApprovedMember()
-        && getAfter(
-          /databases/$(database)/documents/wordRooms/$(roomId)
-        ).data.leaderUid == request.auth.uid
+      allow create: if isApprovedMember()
+        && (
+          getAfter(/databases/$(database)/documents/wordRooms/$(roomId)).data.leaderUid == request.auth.uid
+          || isApprovedAdmin()
+        )
+        && getAfter(/databases/$(database)/documents/wordRooms/$(roomId)).data.memberUids.hasAny([uid])
+        && get(/databases/$(database)/documents/users/$(uid)).data.approved == true
         && request.resource.data.keys().hasOnly([
           'uid',
           'name',
@@ -917,10 +934,18 @@ service cloud.firestore {
           == get(
             /databases/$(database)/documents/users/$(uid)
           ).data.name
-        && request.resource.data.role == 'leader'
+        && request.resource.data.role
+          == (getAfter(/databases/$(database)/documents/wordRooms/$(roomId)).data.leaderUid == uid ? 'leader' : 'member')
         && request.resource.data.joinedAt == request.time;
 
-      allow update: if false;
+      allow update: if isApprovedMember()
+        && (
+          get(/databases/$(database)/documents/wordRooms/$(roomId)).data.leaderUid == request.auth.uid
+          || isApprovedAdmin()
+        )
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role'])
+        && request.resource.data.role
+          == (getAfter(/databases/$(database)/documents/wordRooms/$(roomId)).data.leaderUid == uid ? 'leader' : 'member');
 
       allow delete: if isApprovedMember()
         && (
@@ -929,8 +954,12 @@ service cloud.firestore {
           ).data.leaderUid == request.auth.uid
           || isApprovedAdmin()
         )
-        && !existsAfter(
-          /databases/$(database)/documents/wordRooms/$(roomId)
+        && (
+          !existsAfter(/databases/$(database)/documents/wordRooms/$(roomId))
+          || (
+            getAfter(/databases/$(database)/documents/wordRooms/$(roomId)).data.leaderUid != uid
+            && !getAfter(/databases/$(database)/documents/wordRooms/$(roomId)).data.memberUids.hasAny([uid])
+          )
         );
     }
 

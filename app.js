@@ -49,6 +49,7 @@ let editingCommunityGratitudeId = null;
 let wordRoomCache = new Map();
 let editingWordRoomId = null;
 let currentWordRoomId = null;
+let currentWordRoomMembers = new Map();
 
 const communityPrayerReactionTypes = [
   { key: "prayer", countField: "reactionPrayerCount", emoji: "🙏", label: "기도할게요" },
@@ -254,6 +255,14 @@ async function routeAuthenticatedUser(user) {
       `${profile.name}님의 가입 승인을 기다리고 있습니다.`;
     showScreen("pending-screen", { historyMode: "replace" });
     return;
+  }
+
+  try {
+    await setDoc(doc(db, "memberDirectory", user.uid), {
+      uid: user.uid, name: profile.name, updatedAt: serverTimestamp()
+    }, { merge: true });
+  } catch {
+    // 새 규칙 게시 전에도 로그인을 유지합니다.
   }
 
   document.getElementById("welcome-name").textContent =
@@ -3090,7 +3099,118 @@ async function deleteWordRoom(roomId) {
   }
 }
 
-function openWordRoom(roomId) {
+function renderWordRoomMembers(room, members) {
+  currentWordRoomMembers = new Map(members.map((member) => [member.uid, member]));
+  const list = document.getElementById("word-room-member-list");
+  list.replaceChildren();
+  members.forEach((member) => {
+    const row = document.createElement("article");
+    row.className = "word-room-member-row";
+    const info = document.createElement("div");
+    const name = document.createElement("strong");
+    name.textContent = member.name;
+    const role = document.createElement("span");
+    role.className = "word-room-member-role";
+    role.textContent = member.uid === room.leaderUid ? "방장" : "참여자";
+    info.append(name, role);
+    row.append(info);
+    if (room.leaderUid === auth.currentUser.uid && member.uid !== room.leaderUid) {
+      const actions = document.createElement("div");
+      actions.className = "word-room-member-actions";
+      actions.append(
+        createPrayerActionButton("방장으로 변경", "secondary-button word-room-member-button", () => transferWordRoomLeadership(member.uid)),
+        createPrayerActionButton("퇴장", "secondary-button word-room-member-button prayer-delete-button", () => removeWordRoomMember(member.uid))
+      );
+      row.append(actions);
+    }
+    list.append(row);
+  });
+}
+
+async function refreshCurrentWordRoom() {
+  const roomSnapshot = await getDoc(doc(db, "wordRooms", currentWordRoomId));
+  if (!roomSnapshot.exists()) throw new Error("Room not found");
+  const room = { id: roomSnapshot.id, ...roomSnapshot.data() };
+  wordRoomCache.set(room.id, room);
+  document.getElementById("word-room-detail-meta").textContent =
+    "방장 " + room.leaderName + " · " + formatWordRoomMemberCount(room);
+  const memberSnapshot = await getDocs(collection(db, "wordRooms", room.id, "members"));
+  const members = memberSnapshot.docs.map((item) => ({ uid: item.id, ...item.data() }))
+    .sort((a, b) => a.uid === room.leaderUid ? -1 : b.uid === room.leaderUid ? 1 : a.name.localeCompare(b.name, "ko"));
+  renderWordRoomMembers(room, members);
+
+  const inviteSection = document.getElementById("word-room-invite-section");
+  inviteSection.hidden = room.leaderUid !== auth.currentUser.uid;
+  if (!inviteSection.hidden) {
+    const directory = await getDocs(collection(db, "memberDirectory"));
+    const candidates = directory.docs.map((item) => item.data())
+      .filter((member) => !room.memberUids.includes(member.uid))
+      .sort((a, b) => a.name.localeCompare(b.name, "ko"));
+    const select = document.getElementById("word-room-invite-member");
+    select.replaceChildren();
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = candidates.length ? "초대할 회원을 선택하세요" : "초대할 수 있는 회원이 없습니다";
+    select.append(placeholder);
+    candidates.forEach((member) => {
+      const option = document.createElement("option");
+      option.value = member.uid;
+      option.textContent = member.name;
+      select.append(option);
+    });
+    select.disabled = candidates.length === 0;
+    document.getElementById("word-room-invite-button").disabled = candidates.length === 0;
+  }
+  return room;
+}
+
+async function inviteWordRoomMember() {
+  const uid = document.getElementById("word-room-invite-member").value;
+  const room = wordRoomCache.get(currentWordRoomId);
+  if (!uid || !room || room.leaderUid !== auth.currentUser.uid) return;
+  const personSnapshot = await getDoc(doc(db, "memberDirectory", uid));
+  if (!personSnapshot.exists()) return;
+  const person = personSnapshot.data();
+  const batch = writeBatch(db);
+  batch.update(doc(db, "wordRooms", room.id), { memberUids: [...room.memberUids, uid], updatedAt: serverTimestamp() });
+  batch.set(doc(db, "wordRooms", room.id, "members", uid), { uid, name: person.name, role: "member", joinedAt: serverTimestamp() });
+  try {
+    await batch.commit();
+    await refreshCurrentWordRoom();
+    setMessage("word-room-detail-message", person.name + "님을 초대했습니다.", "success");
+  } catch { setMessage("word-room-detail-message", "회원을 초대하지 못했습니다.", "error"); }
+}
+
+async function removeWordRoomMember(uid) {
+  const room = wordRoomCache.get(currentWordRoomId);
+  const member = currentWordRoomMembers.get(uid);
+  if (!room || !member || room.leaderUid !== auth.currentUser.uid || !window.confirm(member.name + "님을 말씀방에서 퇴장시키겠습니까?")) return;
+  const batch = writeBatch(db);
+  batch.update(doc(db, "wordRooms", room.id), { memberUids: room.memberUids.filter((item) => item !== uid), updatedAt: serverTimestamp() });
+  batch.delete(doc(db, "wordRooms", room.id, "members", uid));
+  try {
+    await batch.commit();
+    await refreshCurrentWordRoom();
+    setMessage("word-room-detail-message", member.name + "님을 퇴장 처리했습니다.", "success");
+  } catch { setMessage("word-room-detail-message", "퇴장 처리하지 못했습니다.", "error"); }
+}
+
+async function transferWordRoomLeadership(uid) {
+  const room = wordRoomCache.get(currentWordRoomId);
+  const member = currentWordRoomMembers.get(uid);
+  if (!room || !member || room.leaderUid !== auth.currentUser.uid || !window.confirm(member.name + "님에게 방장을 넘기시겠습니까?")) return;
+  const batch = writeBatch(db);
+  batch.update(doc(db, "wordRooms", room.id), { leaderUid: uid, leaderName: member.name, updatedAt: serverTimestamp() });
+  batch.update(doc(db, "wordRooms", room.id, "members", room.leaderUid), { role: "member" });
+  batch.update(doc(db, "wordRooms", room.id, "members", uid), { role: "leader" });
+  try {
+    await batch.commit();
+    await refreshCurrentWordRoom();
+    setMessage("word-room-detail-message", member.name + "님이 새 방장이 되었습니다.", "success");
+  } catch { setMessage("word-room-detail-message", "방장을 변경하지 못했습니다.", "error"); }
+}
+
+async function openWordRoom(roomId) {
   const room = wordRoomCache.get(roomId);
   if (!room) {
     return;
@@ -3105,6 +3225,11 @@ function openWordRoom(roomId) {
     "방장 " + room.leaderName + " · " +
     formatWordRoomMemberCount(room);
   showScreen("word-room-detail-screen");
+  setMessage("word-room-detail-message", "참여자 목록을 불러오는 중입니다.");
+  try {
+    await refreshCurrentWordRoom();
+    setMessage("word-room-detail-message", "");
+  } catch { setMessage("word-room-detail-message", "참여자 목록을 불러오지 못했습니다.", "error"); }
 }
 
 async function openWordRooms() {
@@ -3521,6 +3646,7 @@ window.openWordRooms = openWordRooms;
 window.openWordRoom = openWordRoom;
 window.saveWordRoom = saveWordRoom;
 window.resetWordRoomForm = resetWordRoomForm;
+window.inviteWordRoomMember = inviteWordRoomMember;
 window.showGratitudeTab = showGratitudeTab;
 window.savePrivateGratitude = savePrivateGratitude;
 window.resetPrivateGratitudeForm = resetPrivateGratitudeForm;
