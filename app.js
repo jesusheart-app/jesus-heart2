@@ -41,6 +41,10 @@ let editingPrivatePrayerId = null;
 let editingCommunityPrayerId = null;
 let wordNoteCache = new Map();
 let editingWordNoteId = null;
+let privateGratitudeCache = new Map();
+let communityGratitudeCache = new Map();
+let editingPrivateGratitudeId = null;
+let editingCommunityGratitudeId = null;
 
 const communityPrayerReactionTypes = [
   { key: "prayer", countField: "reactionPrayerCount", emoji: "🙏", label: "기도할게요" },
@@ -2001,6 +2005,468 @@ async function openWordNotes() {
   }
 }
 
+function showGratitudeTab(tabName) {
+  const isPrivate = tabName === "private";
+  const privatePanel = document.getElementById("private-gratitude-panel");
+  const communityPanel = document.getElementById("community-gratitude-panel");
+  const privateTab = document.getElementById("private-gratitude-tab");
+  const communityTab = document.getElementById("community-gratitude-tab");
+
+  privatePanel.hidden = !isPrivate;
+  communityPanel.hidden = isPrivate;
+  privateTab.classList.toggle("active", isPrivate);
+  communityTab.classList.toggle("active", !isPrivate);
+  privateTab.setAttribute("aria-selected", String(isPrivate));
+  communityTab.setAttribute("aria-selected", String(!isPrivate));
+}
+
+function resetPrivateGratitudeForm() {
+  editingPrivateGratitudeId = null;
+  document.getElementById("private-gratitude-date").value =
+    getTodayDateKey();
+  document.getElementById("private-gratitude-content").value = "";
+  document.getElementById("private-gratitude-save-button").textContent =
+    "감사 기록 저장";
+  document.getElementById("private-gratitude-cancel-button").hidden = true;
+  setMessage("private-gratitude-message", "");
+}
+
+function renderPrivateGratitudes(documents) {
+  const list = document.getElementById("private-gratitude-list");
+  list.replaceChildren();
+  privateGratitudeCache = new Map();
+
+  if (documents.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "gratitude-empty";
+    empty.textContent = "아직 기록한 감사가 없습니다.";
+    list.append(empty);
+    return;
+  }
+
+  documents.forEach((gratitudeDocument) => {
+    const gratitude = {
+      id: gratitudeDocument.id,
+      ...gratitudeDocument.data()
+    };
+    privateGratitudeCache.set(gratitude.id, gratitude);
+
+    const card = document.createElement("article");
+    card.className = "gratitude-card";
+
+    const date = document.createElement("p");
+    date.className = "gratitude-date";
+    date.textContent = formatBibleCheckDate(gratitude.date);
+    card.append(date);
+
+    const content = document.createElement("p");
+    content.className = "gratitude-text";
+    content.textContent = gratitude.content;
+    card.append(content);
+
+    const actions = document.createElement("div");
+    actions.className = "prayer-record-actions";
+    actions.append(
+      createPrayerActionButton(
+        "수정",
+        "secondary-button prayer-small-button",
+        () => editPrivateGratitude(gratitude.id)
+      ),
+      createPrayerActionButton(
+        "삭제",
+        "secondary-button prayer-small-button prayer-delete-button",
+        () => deletePrivateGratitude(gratitude.id)
+      )
+    );
+    card.append(actions);
+    list.append(card);
+  });
+}
+
+async function loadPrivateGratitudes() {
+  const gratitudeQuery = query(
+    collection(db, "users", auth.currentUser.uid, "gratitudes"),
+    orderBy("date", "desc")
+  );
+  const snapshot = await getDocs(gratitudeQuery);
+  renderPrivateGratitudes(snapshot.docs);
+}
+
+async function savePrivateGratitude() {
+  const date = document.getElementById("private-gratitude-date").value;
+  const content = document
+    .getElementById("private-gratitude-content")
+    .value.trim();
+
+  if (!isValidBibleCheckDate(date)) {
+    setMessage(
+      "private-gratitude-message",
+      "오늘 또는 지난 날짜를 선택해주세요.",
+      "error"
+    );
+    return;
+  }
+
+  if (!content || content.length > 2000) {
+    setMessage(
+      "private-gratitude-message",
+      "감사 내용은 1자 이상 2,000자 이내로 입력해주세요.",
+      "error"
+    );
+    return;
+  }
+
+  const wasEditing = Boolean(editingPrivateGratitudeId);
+  setBusy(
+    "private-gratitude-save-button",
+    true,
+    "저장 중...",
+    wasEditing ? "감사 기록 수정" : "감사 기록 저장"
+  );
+
+  try {
+    if (editingPrivateGratitudeId) {
+      const gratitude = privateGratitudeCache.get(
+        editingPrivateGratitudeId
+      );
+      if (!gratitude || gratitude.uid !== auth.currentUser.uid) {
+        throw new Error("Private gratitude not found");
+      }
+
+      await updateDoc(
+        doc(
+          db,
+          "users",
+          auth.currentUser.uid,
+          "gratitudes",
+          editingPrivateGratitudeId
+        ),
+        {
+          date,
+          content,
+          updatedAt: serverTimestamp()
+        }
+      );
+    } else {
+      const reference = doc(
+        collection(db, "users", auth.currentUser.uid, "gratitudes")
+      );
+      await setDoc(reference, {
+        uid: auth.currentUser.uid,
+        date,
+        content,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+    }
+
+    resetPrivateGratitudeForm();
+    await loadPrivateGratitudes();
+    setMessage(
+      "private-gratitude-message",
+      wasEditing ? "감사 기록을 수정했습니다." : "감사를 기록했습니다.",
+      "success"
+    );
+  } catch {
+    setMessage(
+      "private-gratitude-message",
+      "감사 기록을 저장하지 못했습니다.",
+      "error"
+    );
+  } finally {
+    const button = document.getElementById(
+      "private-gratitude-save-button"
+    );
+    button.disabled = false;
+    button.textContent = editingPrivateGratitudeId
+      ? "감사 기록 수정"
+      : "감사 기록 저장";
+  }
+}
+
+function editPrivateGratitude(gratitudeId) {
+  const gratitude = privateGratitudeCache.get(gratitudeId);
+  if (!gratitude || gratitude.uid !== auth.currentUser?.uid) {
+    return;
+  }
+
+  editingPrivateGratitudeId = gratitudeId;
+  document.getElementById("private-gratitude-date").value =
+    gratitude.date;
+  document.getElementById("private-gratitude-content").value =
+    gratitude.content;
+  document.getElementById("private-gratitude-save-button").textContent =
+    "감사 기록 수정";
+  document.getElementById("private-gratitude-cancel-button").hidden =
+    false;
+  setMessage("private-gratitude-message", "수정할 내용을 확인해주세요.");
+  document.getElementById("private-gratitude-content").focus();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+async function deletePrivateGratitude(gratitudeId) {
+  const gratitude = privateGratitudeCache.get(gratitudeId);
+  if (
+    !gratitude ||
+    gratitude.uid !== auth.currentUser?.uid ||
+    !window.confirm("이 감사 기록을 삭제하시겠습니까?")
+  ) {
+    return;
+  }
+
+  try {
+    await deleteDoc(
+      doc(
+        db,
+        "users",
+        auth.currentUser.uid,
+        "gratitudes",
+        gratitudeId
+      )
+    );
+    if (editingPrivateGratitudeId === gratitudeId) {
+      resetPrivateGratitudeForm();
+    }
+    await loadPrivateGratitudes();
+    setMessage(
+      "private-gratitude-message",
+      "감사 기록을 삭제했습니다.",
+      "success"
+    );
+  } catch {
+    setMessage(
+      "private-gratitude-message",
+      "감사 기록을 삭제하지 못했습니다.",
+      "error"
+    );
+  }
+}
+
+function resetCommunityGratitudeForm() {
+  editingCommunityGratitudeId = null;
+  document.getElementById("community-gratitude-content").value = "";
+  document.getElementById("community-gratitude-save-button").textContent =
+    "감사 나누기";
+  document.getElementById("community-gratitude-cancel-button").hidden =
+    true;
+  setMessage("community-gratitude-message", "");
+}
+
+function renderCommunityGratitudes(documents) {
+  const list = document.getElementById("community-gratitude-list");
+  list.replaceChildren();
+  communityGratitudeCache = new Map();
+
+  if (documents.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "gratitude-empty";
+    empty.textContent = "아직 함께 나눈 감사가 없습니다.";
+    list.append(empty);
+    return;
+  }
+
+  documents.forEach((gratitudeDocument) => {
+    const gratitude = {
+      id: gratitudeDocument.id,
+      ...gratitudeDocument.data()
+    };
+    communityGratitudeCache.set(gratitude.id, gratitude);
+
+    const card = document.createElement("article");
+    card.className = "gratitude-card community-gratitude-card";
+
+    const meta = document.createElement("p");
+    meta.className = "gratitude-date";
+    meta.textContent =
+      gratitude.authorDisplay + " · " +
+      formatPrayerDate(gratitude.createdAt);
+    card.append(meta);
+
+    const content = document.createElement("p");
+    content.className = "gratitude-text";
+    content.textContent = gratitude.content;
+    card.append(content);
+
+    if (gratitude.uid === auth.currentUser?.uid) {
+      const actions = document.createElement("div");
+      actions.className = "prayer-record-actions";
+      actions.append(
+        createPrayerActionButton(
+          "수정",
+          "secondary-button prayer-small-button",
+          () => editCommunityGratitude(gratitude.id)
+        ),
+        createPrayerActionButton(
+          "삭제",
+          "secondary-button prayer-small-button prayer-delete-button",
+          () => deleteCommunityGratitude(gratitude.id)
+        )
+      );
+      card.append(actions);
+    }
+
+    list.append(card);
+  });
+}
+
+async function loadCommunityGratitudes() {
+  const gratitudeQuery = query(
+    collection(db, "communityGratitudes"),
+    orderBy("createdAt", "desc"),
+    limit(20)
+  );
+  const snapshot = await getDocs(gratitudeQuery);
+  renderCommunityGratitudes(snapshot.docs);
+}
+
+async function saveCommunityGratitude() {
+  const content = document
+    .getElementById("community-gratitude-content")
+    .value.trim();
+
+  if (!content || content.length > 2000) {
+    setMessage(
+      "community-gratitude-message",
+      "감사 내용은 1자 이상 2,000자 이내로 입력해주세요.",
+      "error"
+    );
+    return;
+  }
+
+  const wasEditing = Boolean(editingCommunityGratitudeId);
+  setBusy(
+    "community-gratitude-save-button",
+    true,
+    "나누는 중...",
+    wasEditing ? "감사 나눔 수정" : "감사 나누기"
+  );
+
+  try {
+    if (editingCommunityGratitudeId) {
+      const gratitude = communityGratitudeCache.get(
+        editingCommunityGratitudeId
+      );
+      if (!gratitude || gratitude.uid !== auth.currentUser.uid) {
+        throw new Error("Community gratitude not found");
+      }
+
+      await updateDoc(
+        doc(db, "communityGratitudes", editingCommunityGratitudeId),
+        {
+          content,
+          updatedAt: serverTimestamp()
+        }
+      );
+    } else {
+      const reference = doc(collection(db, "communityGratitudes"));
+      await setDoc(reference, {
+        uid: auth.currentUser.uid,
+        authorDisplay: currentUserProfile.name,
+        content,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+    }
+
+    resetCommunityGratitudeForm();
+    await loadCommunityGratitudes();
+    setMessage(
+      "community-gratitude-message",
+      wasEditing ? "감사 나눔을 수정했습니다." : "감사를 함께 나눴습니다.",
+      "success"
+    );
+  } catch {
+    setMessage(
+      "community-gratitude-message",
+      "감사 나눔을 저장하지 못했습니다.",
+      "error"
+    );
+  } finally {
+    const button = document.getElementById(
+      "community-gratitude-save-button"
+    );
+    button.disabled = false;
+    button.textContent = editingCommunityGratitudeId
+      ? "감사 나눔 수정"
+      : "감사 나누기";
+  }
+}
+
+function editCommunityGratitude(gratitudeId) {
+  const gratitude = communityGratitudeCache.get(gratitudeId);
+  if (!gratitude || gratitude.uid !== auth.currentUser?.uid) {
+    return;
+  }
+
+  editingCommunityGratitudeId = gratitudeId;
+  document.getElementById("community-gratitude-content").value =
+    gratitude.content;
+  document.getElementById("community-gratitude-save-button").textContent =
+    "감사 나눔 수정";
+  document.getElementById("community-gratitude-cancel-button").hidden =
+    false;
+  setMessage("community-gratitude-message", "수정할 내용을 확인해주세요.");
+  document.getElementById("community-gratitude-content").focus();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+async function deleteCommunityGratitude(gratitudeId) {
+  const gratitude = communityGratitudeCache.get(gratitudeId);
+  if (
+    !gratitude ||
+    gratitude.uid !== auth.currentUser?.uid ||
+    !window.confirm("이 감사 나눔을 삭제하시겠습니까?")
+  ) {
+    return;
+  }
+
+  try {
+    await deleteDoc(doc(db, "communityGratitudes", gratitudeId));
+    if (editingCommunityGratitudeId === gratitudeId) {
+      resetCommunityGratitudeForm();
+    }
+    await loadCommunityGratitudes();
+    setMessage(
+      "community-gratitude-message",
+      "감사 나눔을 삭제했습니다.",
+      "success"
+    );
+  } catch {
+    setMessage(
+      "community-gratitude-message",
+      "감사 나눔을 삭제하지 못했습니다.",
+      "error"
+    );
+  }
+}
+
+async function openGratitude() {
+  if (!auth.currentUser || currentUserProfile?.approved !== true) {
+    showScreen("login-screen", { historyMode: "replace" });
+    return;
+  }
+
+  showScreen("thanks-screen");
+  showGratitudeTab("private");
+  resetPrivateGratitudeForm();
+  resetCommunityGratitudeForm();
+  setMessage("private-gratitude-message", "감사 기록을 불러오는 중입니다.");
+
+  try {
+    await Promise.all([
+      loadPrivateGratitudes(),
+      loadCommunityGratitudes()
+    ]);
+    setMessage("private-gratitude-message", "");
+  } catch {
+    setMessage(
+      "private-gratitude-message",
+      "감사 기록을 불러오지 못했습니다. 다시 시도해주세요.",
+      "error"
+    );
+  }
+}
+
 function isCurrentUserApprovedAdmin() {
   return Boolean(
     auth.currentUser &&
@@ -2388,6 +2854,12 @@ window.openMemoryCheck = openMemoryCheck;
 window.toggleMemoryCheck = toggleMemoryCheck;
 window.openPrayer = openPrayer;
 window.openWordNotes = openWordNotes;
+window.openGratitude = openGratitude;
+window.showGratitudeTab = showGratitudeTab;
+window.savePrivateGratitude = savePrivateGratitude;
+window.resetPrivateGratitudeForm = resetPrivateGratitudeForm;
+window.saveCommunityGratitude = saveCommunityGratitude;
+window.resetCommunityGratitudeForm = resetCommunityGratitudeForm;
 window.saveWordNote = saveWordNote;
 window.resetWordNoteForm = resetWordNoteForm;
 window.showPrayerTab = showPrayerTab;
