@@ -370,7 +370,7 @@
 
           <button
             class="menu-button"
-            onclick="showScreen('rooms-screen')"
+            onclick="openWordRooms()"
           >
             <span class="menu-icon">🤝</span>
             <span class="menu-name">말씀방</span>
@@ -414,7 +414,7 @@
 
           <button
             class="nav-button"
-            onclick="showScreen('rooms-screen')"
+            onclick="openWordRooms()"
           >
             <span class="nav-icon">🤝</span>
             말씀방
@@ -1205,12 +1205,11 @@
 
       <header class="app-header">
 
-        <h1 class="header-title">
-          말씀방
-        </h1>
+        <h1 class="header-title">말씀방</h1>
 
         <button
           class="header-button"
+          type="button"
           onclick="goBackOrHome()"
         >
           ←
@@ -1219,26 +1218,118 @@
       </header>
 
 
-      <main class="page-content">
+      <main class="page-content word-room-content">
 
         <div class="page-card">
 
-          <h2>말씀방</h2>
+          <h2>새 말씀방 만들기</h2>
 
           <p>
-            말씀을 읽고 서로의 은혜를 나누는 공간입니다.
+            말씀을 중심으로 함께 걸어갈 소그룹 공간을 만들어보세요.
           </p>
+
+          <div class="word-room-form">
+
+            <label for="word-room-name">방 이름</label>
+
+            <input
+              id="word-room-name"
+              type="text"
+              maxlength="60"
+              placeholder="예: 워십팀 말씀방"
+            >
+
+            <label for="word-room-description">방 설명</label>
+
+            <textarea
+              id="word-room-description"
+              maxlength="500"
+              rows="4"
+              placeholder="말씀방을 간단히 소개해주세요"
+            ></textarea>
+
+            <button
+              id="word-room-save-button"
+              class="primary-button"
+              type="button"
+              onclick="saveWordRoom()"
+            >
+              말씀방 만들기
+            </button>
+
+            <button
+              id="word-room-cancel-button"
+              class="secondary-button word-room-cancel-button"
+              type="button"
+              onclick="resetWordRoomForm()"
+              hidden
+            >
+              수정 취소
+            </button>
+
+            <div
+              id="word-room-message"
+              class="start-message word-room-message"
+              aria-live="polite"
+            ></div>
+
+          </div>
 
         </div>
 
 
         <div class="page-card">
 
-          <h2>준비 중입니다</h2>
+          <h2>내가 참여 중인 말씀방</h2>
+
+          <div id="word-room-list" class="word-room-list"></div>
+
+        </div>
+
+      </main>
+
+    </section>
+
+
+    <section id="word-room-detail-screen" class="screen">
+
+      <header class="app-header">
+
+        <h1 id="word-room-detail-name" class="header-title">말씀방</h1>
+
+        <button
+          class="header-button"
+          type="button"
+          onclick="goBackOrHome()"
+        >
+          ←
+        </button>
+
+      </header>
+
+
+      <main class="page-content word-room-detail-content">
+
+        <div class="page-card">
+
+          <h2>말씀방 안내</h2>
+
+          <p id="word-room-detail-description"></p>
+
+          <p
+            id="word-room-detail-meta"
+            class="word-room-detail-meta"
+          ></p>
+
+        </div>
+
+
+        <div class="page-card">
+
+          <h2>다음 단계에서 연결합니다</h2>
 
           <p>
-            말씀방 생성, 참여자 관리,
-            오늘의 말씀 및 댓글 기능을 연결합니다.
+            참여자 초대와 관리, 읽기 요일과 말씀 계획을 연결합니다.
           </p>
 
         </div>
