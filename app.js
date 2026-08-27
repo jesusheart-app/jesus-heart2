@@ -3134,6 +3134,8 @@ async function refreshCurrentWordRoom() {
   wordRoomCache.set(room.id, room);
   document.getElementById("word-room-detail-meta").textContent =
     "방장 " + room.leaderName + " · " + formatWordRoomMemberCount(room);
+  document.getElementById("word-room-leave-button").hidden =
+    room.leaderUid === auth.currentUser.uid;
   const memberSnapshot = await getDocs(collection(db, "wordRooms", room.id, "members"));
   const members = memberSnapshot.docs.map((item) => ({ uid: item.id, ...item.data() }))
     .sort((a, b) => a.uid === room.leaderUid ? -1 : b.uid === room.leaderUid ? 1 : a.name.localeCompare(b.name, "ko"));
@@ -3208,6 +3210,28 @@ async function transferWordRoomLeadership(uid) {
     await refreshCurrentWordRoom();
     setMessage("word-room-detail-message", member.name + "님이 새 방장이 되었습니다.", "success");
   } catch { setMessage("word-room-detail-message", "방장을 변경하지 못했습니다.", "error"); }
+}
+
+async function leaveWordRoom() {
+  const room = wordRoomCache.get(currentWordRoomId);
+  if (!room || room.leaderUid === auth.currentUser.uid ||
+      !window.confirm("이 말씀방에서 나가시겠습니까?")) return;
+
+  const batch = writeBatch(db);
+  batch.update(doc(db, "wordRooms", room.id), {
+    memberUids: room.memberUids.filter((uid) => uid !== auth.currentUser.uid),
+    updatedAt: serverTimestamp()
+  });
+  batch.delete(doc(db, "wordRooms", room.id, "members", auth.currentUser.uid));
+
+  try {
+    await batch.commit();
+    currentWordRoomId = null;
+    await openWordRooms();
+    setMessage("word-room-message", "말씀방에서 나왔습니다.", "success");
+  } catch {
+    setMessage("word-room-detail-message", "말씀방에서 나가지 못했습니다.", "error");
+  }
 }
 
 async function openWordRoom(roomId) {
@@ -3647,6 +3671,7 @@ window.openWordRoom = openWordRoom;
 window.saveWordRoom = saveWordRoom;
 window.resetWordRoomForm = resetWordRoomForm;
 window.inviteWordRoomMember = inviteWordRoomMember;
+window.leaveWordRoom = leaveWordRoom;
 window.showGratitudeTab = showGratitudeTab;
 window.savePrivateGratitude = savePrivateGratitude;
 window.resetPrivateGratitudeForm = resetPrivateGratitudeForm;

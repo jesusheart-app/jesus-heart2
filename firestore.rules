@@ -869,6 +869,17 @@ service cloud.firestore {
         && (
           resource.data.leaderUid == request.auth.uid
           || isApprovedAdmin()
+          || (
+            request.auth.uid in resource.data.memberUids
+            && resource.data.leaderUid != request.auth.uid
+            && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['memberUids', 'updatedAt'])
+            && !(request.auth.uid in request.resource.data.memberUids)
+            && request.resource.data.memberUids.size()
+              == resource.data.memberUids.size() - 1
+            && request.resource.data.memberUids.toSet()
+              .difference(resource.data.memberUids.toSet()).size() == 0
+          )
         )
         && request.resource.data.keys().hasOnly([
           'name',
@@ -953,6 +964,12 @@ service cloud.firestore {
             /databases/$(database)/documents/wordRooms/$(roomId)
           ).data.leaderUid == request.auth.uid
           || isApprovedAdmin()
+          || (
+            uid == request.auth.uid
+            && get(
+              /databases/$(database)/documents/wordRooms/$(roomId)
+            ).data.leaderUid != uid
+          )
         )
         && (
           !existsAfter(/databases/$(database)/documents/wordRooms/$(roomId))
