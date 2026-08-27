@@ -3269,18 +3269,15 @@ function renderWordRoomPlans(plans, room) {
   list.replaceChildren();
   wordRoomPlanCache = new Map(plans.map((plan) => [plan.id, plan]));
   const today = new Date();
-  const tomorrow = new Date(today);
-  tomorrow.setDate(today.getDate() + 1);
   const todayKey = localDateKey(today);
-  const tomorrowKey = localDateKey(tomorrow);
   const visiblePlans = showAllWordRoomPlans
     ? plans
-    : plans.filter((plan) => [todayKey, tomorrowKey].includes(plan.date));
+    : plans.filter((plan) => plan.date === todayKey);
 
   const toggleButton = document.getElementById("word-room-plan-toggle-button");
   toggleButton.hidden = plans.length === 0;
   toggleButton.textContent = showAllWordRoomPlans
-    ? "오늘·내일만 보기"
+    ? "오늘 계획만 보기"
     : "전체 계획 보기";
 
   if (visiblePlans.length === 0) {
@@ -3288,7 +3285,7 @@ function renderWordRoomPlans(plans, room) {
     empty.className = "word-room-empty";
     empty.textContent = plans.length === 0
       ? "등록된 말씀 계획이 없습니다."
-      : "오늘과 내일 등록된 말씀 계획이 없습니다.";
+      : "오늘 등록된 말씀 계획이 없습니다.";
     list.append(empty);
     return;
   }
@@ -3297,8 +3294,7 @@ function renderWordRoomPlans(plans, room) {
     const card = document.createElement("article");
     card.className = "word-room-plan-card";
     const date = document.createElement("strong");
-    const dayLabel = plan.date === todayKey ? "오늘 · " :
-      plan.date === tomorrowKey ? "내일 · " : "";
+    const dayLabel = plan.date === todayKey ? "오늘 · " : "";
     date.textContent = dayLabel + new Date(plan.date + "T00:00:00").toLocaleDateString("ko-KR", {
       year: "numeric", month: "long", day: "numeric", weekday: "short"
     });
