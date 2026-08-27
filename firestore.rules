@@ -980,6 +980,58 @@ service cloud.firestore {
         );
     }
 
+    match /wordRooms/{roomId}/plans/{planId} {
+      allow read: if isApprovedMember()
+        && exists(/databases/$(database)/documents/wordRooms/$(roomId))
+        && (
+          request.auth.uid in get(
+            /databases/$(database)/documents/wordRooms/$(roomId)
+          ).data.memberUids
+          || isApprovedAdmin()
+        );
+
+      allow create: if isApprovedMember()
+        && get(/databases/$(database)/documents/wordRooms/$(roomId)).data.leaderUid
+          == request.auth.uid
+        && request.resource.data.keys().hasOnly([
+          'date', 'passage', 'note', 'createdBy', 'createdAt', 'updatedAt'
+        ])
+        && request.resource.data.date is string
+        && request.resource.data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && request.resource.data.passage is string
+        && request.resource.data.passage.size() >= 1
+        && request.resource.data.passage.size() <= 120
+        && request.resource.data.note is string
+        && request.resource.data.note.size() <= 500
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+
+      allow update: if isApprovedMember()
+        && get(/databases/$(database)/documents/wordRooms/$(roomId)).data.leaderUid
+          == request.auth.uid
+        && request.resource.data.keys().hasOnly([
+          'date', 'passage', 'note', 'createdBy', 'createdAt', 'updatedAt'
+        ])
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.date is string
+        && request.resource.data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && request.resource.data.passage is string
+        && request.resource.data.passage.size() >= 1
+        && request.resource.data.passage.size() <= 120
+        && request.resource.data.note is string
+        && request.resource.data.note.size() <= 500
+        && request.resource.data.updatedAt == request.time;
+
+      allow delete: if isApprovedMember()
+        && (
+          get(/databases/$(database)/documents/wordRooms/$(roomId)).data.leaderUid
+            == request.auth.uid
+          || isApprovedAdmin()
+        );
+    }
+
     match /loginNames/{nameHash}/members/{uid} {
       allow read: if true;
 
