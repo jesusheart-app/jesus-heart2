@@ -52,6 +52,12 @@ const communityPrayerReactionTypes = [
   { key: "amen", countField: "reactionAmenCount", emoji: "🙌", label: "아멘" }
 ];
 
+const communityGratitudeReactionTypes = [
+  { key: "joy", countField: "reactionJoyCount", emoji: "❤️", label: "함께 기뻐요" },
+  { key: "thanks", countField: "reactionThanksCount", emoji: "🙌", label: "감사해요" },
+  { key: "grace", countField: "reactionGraceCount", emoji: "😊", label: "은혜받았어요" }
+];
+
 function showScreen(screenId, options = {}) {
   const target = document.getElementById(screenId);
   if (!target || !target.classList.contains("screen")) {
@@ -2252,6 +2258,331 @@ function resetCommunityGratitudeForm() {
   setMessage("community-gratitude-message", "");
 }
 
+async function toggleCommunityGratitudeReaction(
+  gratitude,
+  reactionType
+) {
+  if (!auth.currentUser || gratitude.uid === auth.currentUser.uid) {
+    return;
+  }
+
+  const gratitudeReference = doc(
+    db,
+    "communityGratitudes",
+    gratitude.id
+  );
+  const reactionReference = doc(
+    db,
+    "communityGratitudes",
+    gratitude.id,
+    "privateReactions",
+    auth.currentUser.uid
+  );
+
+  await runTransaction(db, async (transaction) => {
+    const gratitudeSnapshot = await transaction.get(gratitudeReference);
+    const reactionSnapshot = await transaction.get(reactionReference);
+
+    if (!gratitudeSnapshot.exists()) {
+      throw new Error("Community gratitude not found");
+    }
+
+    const gratitudeData = gratitudeSnapshot.data();
+    if (gratitudeData.uid === auth.currentUser.uid) {
+      throw new Error("Authors cannot react to their own gratitude");
+    }
+
+    const current = reactionSnapshot.exists()
+      ? reactionSnapshot.data()
+      : { joy: false, thanks: false, grace: false };
+    const next = {
+      joy: current.joy === true,
+      thanks: current.thanks === true,
+      grace: current.grace === true
+    };
+    const wasSelected = next[reactionType.key];
+    next[reactionType.key] = !wasSelected;
+
+    const nextCounts = {
+      reactionJoyCount: Number(gratitudeData.reactionJoyCount || 0),
+      reactionThanksCount: Number(gratitudeData.reactionThanksCount || 0),
+      reactionGraceCount: Number(gratitudeData.reactionGraceCount || 0)
+    };
+    nextCounts[reactionType.countField] += wasSelected ? -1 : 1;
+
+    if (nextCounts[reactionType.countField] < 0) {
+      throw new Error("Invalid reaction count");
+    }
+
+    transaction.update(gratitudeReference, nextCounts);
+    transaction.set(reactionReference, {
+      ...next,
+      updatedAt: serverTimestamp()
+    });
+  });
+}
+
+async function renderCommunityGratitudeReactions(
+  gratitude,
+  container
+) {
+  container.textContent = "반응을 불러오는 중입니다.";
+
+  try {
+    const reactionSnapshot = await getDoc(
+      doc(
+        db,
+        "communityGratitudes",
+        gratitude.id,
+        "privateReactions",
+        auth.currentUser.uid
+      )
+    );
+    const mine = reactionSnapshot.exists()
+      ? reactionSnapshot.data()
+      : { joy: false, thanks: false, grace: false };
+    const isAuthor = gratitude.uid === auth.currentUser?.uid;
+
+    container.replaceChildren();
+
+    communityGratitudeReactionTypes.forEach((reactionType) => {
+      const { key, countField, emoji, label } = reactionType;
+      const count = Number(gratitude[countField] || 0);
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "prayer-reaction-button";
+      button.textContent = emoji + " " + label + (count ? " " + count : "");
+      button.disabled = isAuthor;
+      button.setAttribute("aria-pressed", mine[key] === true ? "true" : "false");
+
+      if (mine[key] === true) {
+        button.classList.add("active");
+      }
+
+      if (isAuthor) {
+        button.title = "작성자는 자신의 감사나눔에 반응할 수 없습니다.";
+      } else {
+        button.addEventListener("click", async () => {
+          button.disabled = true;
+          try {
+            await toggleCommunityGratitudeReaction(
+              gratitude,
+              reactionType
+            );
+            await loadCommunityGratitudes();
+          } catch {
+            button.disabled = false;
+            setMessage(
+              "community-gratitude-message",
+              "반응을 저장하지 못했습니다. 다시 시도해주세요.",
+              "error"
+            );
+          }
+        });
+      }
+
+      container.append(button);
+    });
+
+    if (isAuthor) {
+      const guide = document.createElement("p");
+      guide.className = "prayer-reaction-guide";
+      guide.textContent =
+        "다른 회원들이 이 감사에 함께 마음을 보탤 수 있어요.";
+      container.append(guide);
+    }
+  } catch {
+    container.textContent = "반응을 불러오지 못했습니다.";
+  }
+}
+
+async function saveCommunityGratitudeComment(
+  gratitude,
+  input,
+  button,
+  container
+) {
+  const content = input.value.trim();
+  if (!content) {
+    return;
+  }
+
+  if (content.length > 500) {
+    setMessage(
+      "community-gratitude-message",
+      "댓글은 500자 이내로 입력해주세요.",
+      "error"
+    );
+    return;
+  }
+
+  button.disabled = true;
+  button.textContent = "등록 중...";
+
+  try {
+    const reference = doc(
+      collection(
+        db,
+        "communityGratitudes",
+        gratitude.id,
+        "comments"
+      )
+    );
+    await setDoc(reference, {
+      uid: auth.currentUser.uid,
+      authorDisplay: currentUserProfile.name,
+      content,
+      createdAt: serverTimestamp()
+    });
+    input.value = "";
+    await renderCommunityGratitudeComments(gratitude, container);
+  } catch {
+    button.disabled = false;
+    button.textContent = "댓글 등록";
+    setMessage(
+      "community-gratitude-message",
+      "댓글을 등록하지 못했습니다. 다시 시도해주세요.",
+      "error"
+    );
+  }
+}
+
+async function deleteCommunityGratitudeComment(
+  gratitude,
+  comment,
+  container
+) {
+  if (
+    comment.uid !== auth.currentUser?.uid ||
+    !window.confirm("이 댓글을 삭제하시겠습니까?")
+  ) {
+    return;
+  }
+
+  try {
+    await deleteDoc(
+      doc(
+        db,
+        "communityGratitudes",
+        gratitude.id,
+        "comments",
+        comment.id
+      )
+    );
+    await renderCommunityGratitudeComments(gratitude, container);
+  } catch {
+    setMessage(
+      "community-gratitude-message",
+      "댓글을 삭제하지 못했습니다.",
+      "error"
+    );
+  }
+}
+
+async function renderCommunityGratitudeComments(
+  gratitude,
+  container
+) {
+  container.textContent = "댓글을 불러오는 중입니다.";
+
+  try {
+    const snapshot = await getDocs(
+      query(
+        collection(
+          db,
+          "communityGratitudes",
+          gratitude.id,
+          "comments"
+        ),
+        orderBy("createdAt", "asc")
+      )
+    );
+    container.replaceChildren();
+
+    const heading = document.createElement("h4");
+    heading.className = "prayer-comment-heading";
+    heading.textContent = "댓글 " + snapshot.size;
+    container.append(heading);
+
+    const list = document.createElement("div");
+    list.className = "prayer-comment-list";
+
+    if (snapshot.empty) {
+      const empty = document.createElement("p");
+      empty.className = "prayer-comment-empty";
+      empty.textContent = "아직 댓글이 없습니다.";
+      list.append(empty);
+    } else {
+      snapshot.docs.forEach((commentDocument) => {
+        const comment = {
+          id: commentDocument.id,
+          ...commentDocument.data()
+        };
+        const item = document.createElement("div");
+        item.className = "prayer-comment-item";
+
+        const meta = document.createElement("p");
+        meta.className = "prayer-comment-meta";
+        meta.textContent =
+          comment.authorDisplay + " · " +
+          formatPrayerDate(comment.createdAt);
+        item.append(meta);
+
+        const text = document.createElement("p");
+        text.className = "prayer-comment-text";
+        text.textContent = comment.content;
+        item.append(text);
+
+        if (comment.uid === auth.currentUser?.uid) {
+          const remove = document.createElement("button");
+          remove.type = "button";
+          remove.className = "prayer-comment-delete";
+          remove.textContent = "삭제";
+          remove.addEventListener("click", () =>
+            deleteCommunityGratitudeComment(
+              gratitude,
+              comment,
+              container
+            )
+          );
+          item.append(remove);
+        }
+
+        list.append(item);
+      });
+    }
+
+    container.append(list);
+
+    const form = document.createElement("div");
+    form.className = "prayer-comment-form";
+
+    const input = document.createElement("textarea");
+    input.rows = 2;
+    input.maxLength = 500;
+    input.placeholder = "함께 나눌 말을 남겨주세요";
+    input.setAttribute("aria-label", "감사 댓글");
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "secondary-button prayer-comment-submit";
+    button.textContent = "댓글 등록";
+    button.addEventListener("click", () =>
+      saveCommunityGratitudeComment(
+        gratitude,
+        input,
+        button,
+        container
+      )
+    );
+
+    form.append(input, button);
+    container.append(form);
+  } catch {
+    container.textContent = "댓글을 불러오지 못했습니다.";
+  }
+}
+
 function renderCommunityGratitudes(documents) {
   const list = document.getElementById("community-gratitude-list");
   list.replaceChildren();
@@ -2304,6 +2635,16 @@ function renderCommunityGratitudes(documents) {
       );
       card.append(actions);
     }
+
+    const reactions = document.createElement("div");
+    reactions.className = "prayer-reactions";
+    card.append(reactions);
+    renderCommunityGratitudeReactions(gratitude, reactions);
+
+    const comments = document.createElement("div");
+    comments.className = "prayer-comments";
+    card.append(comments);
+    renderCommunityGratitudeComments(gratitude, comments);
 
     list.append(card);
   });
@@ -2363,6 +2704,9 @@ async function saveCommunityGratitude() {
         uid: auth.currentUser.uid,
         authorDisplay: currentUserProfile.name,
         content,
+        reactionJoyCount: 0,
+        reactionThanksCount: 0,
+        reactionGraceCount: 0,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       });
@@ -2421,7 +2765,27 @@ async function deleteCommunityGratitude(gratitudeId) {
   }
 
   try {
-    await deleteDoc(doc(db, "communityGratitudes", gratitudeId));
+    const gratitudeReference = doc(
+      db,
+      "communityGratitudes",
+      gratitudeId
+    );
+    const commentsSnapshot = await getDocs(
+      collection(
+        db,
+        "communityGratitudes",
+        gratitudeId,
+        "comments"
+      )
+    );
+    const batch = writeBatch(db);
+
+    commentsSnapshot.docs.forEach((commentDocument) => {
+      batch.delete(commentDocument.ref);
+    });
+    batch.delete(gratitudeReference);
+    await batch.commit();
+
     if (editingCommunityGratitudeId === gratitudeId) {
       resetCommunityGratitudeForm();
     }
