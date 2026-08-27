@@ -39,6 +39,8 @@ let privatePrayerCache = new Map();
 let communityPrayerCache = new Map();
 let editingPrivatePrayerId = null;
 let editingCommunityPrayerId = null;
+let wordNoteCache = new Map();
+let editingWordNoteId = null;
 
 const communityPrayerReactionTypes = [
   { key: "prayer", countField: "reactionPrayerCount", emoji: "🙏", label: "기도할게요" },
@@ -1757,6 +1759,248 @@ async function openPrayer() {
   }
 }
 
+function resetWordNoteForm() {
+  editingWordNoteId = null;
+  document.getElementById("word-note-date").value = getTodayDateKey();
+  document.getElementById("word-note-passage").value = "";
+  document.getElementById("word-note-content").value = "";
+  document.getElementById("word-note-save-button").textContent =
+    "말씀노트 저장";
+  document.getElementById("word-note-cancel-button").hidden = true;
+  setMessage("word-note-message", "");
+}
+
+function renderWordNotes(documents) {
+  const list = document.getElementById("word-note-list");
+  list.replaceChildren();
+  wordNoteCache = new Map();
+
+  if (documents.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "word-note-empty";
+    empty.textContent = "아직 기록한 말씀노트가 없습니다.";
+    list.append(empty);
+    return;
+  }
+
+  documents.forEach((noteDocument) => {
+    const note = { id: noteDocument.id, ...noteDocument.data() };
+    wordNoteCache.set(note.id, note);
+
+    const card = document.createElement("article");
+    card.className = "word-note-card";
+
+    const date = document.createElement("p");
+    date.className = "word-note-date";
+    date.textContent = formatBibleCheckDate(note.date);
+    card.append(date);
+
+    if (note.passage) {
+      const passage = document.createElement("h3");
+      passage.className = "word-note-passage";
+      passage.textContent = note.passage;
+      card.append(passage);
+    }
+
+    const content = document.createElement("p");
+    content.className = "word-note-text";
+    content.textContent = note.content;
+    card.append(content);
+
+    const actions = document.createElement("div");
+    actions.className = "prayer-record-actions";
+    actions.append(
+      createPrayerActionButton(
+        "수정",
+        "secondary-button prayer-small-button",
+        () => editWordNote(note.id)
+      ),
+      createPrayerActionButton(
+        "삭제",
+        "secondary-button prayer-small-button prayer-delete-button",
+        () => deleteWordNote(note.id)
+      )
+    );
+    card.append(actions);
+    list.append(card);
+  });
+}
+
+async function loadWordNotes() {
+  const notesQuery = query(
+    collection(db, "users", auth.currentUser.uid, "wordNotes"),
+    orderBy("date", "desc")
+  );
+  const snapshot = await getDocs(notesQuery);
+  renderWordNotes(snapshot.docs);
+}
+
+async function saveWordNote() {
+  const date = document.getElementById("word-note-date").value;
+  const passage = document.getElementById("word-note-passage").value.trim();
+  const content = document.getElementById("word-note-content").value.trim();
+
+  setMessage("word-note-message", "");
+
+  if (!isValidBibleCheckDate(date)) {
+    setMessage(
+      "word-note-message",
+      "오늘 또는 지난 날짜를 선택해주세요.",
+      "error"
+    );
+    return;
+  }
+
+  if (!content) {
+    setMessage("word-note-message", "묵상 내용을 입력해주세요.", "error");
+    return;
+  }
+
+  if (passage.length > 120 || content.length > 5000) {
+    setMessage(
+      "word-note-message",
+      "말씀 구절은 120자, 묵상 내용은 5,000자 이내로 입력해주세요.",
+      "error"
+    );
+    return;
+  }
+
+  const wasEditing = Boolean(editingWordNoteId);
+  setBusy(
+    "word-note-save-button",
+    true,
+    "저장 중...",
+    wasEditing ? "말씀노트 수정" : "말씀노트 저장"
+  );
+
+  try {
+    if (editingWordNoteId) {
+      const note = wordNoteCache.get(editingWordNoteId);
+      if (!note || note.uid !== auth.currentUser.uid) {
+        throw new Error("Word note not found");
+      }
+
+      await updateDoc(
+        doc(
+          db,
+          "users",
+          auth.currentUser.uid,
+          "wordNotes",
+          editingWordNoteId
+        ),
+        {
+          date,
+          passage,
+          content,
+          updatedAt: serverTimestamp()
+        }
+      );
+    } else {
+      const reference = doc(
+        collection(db, "users", auth.currentUser.uid, "wordNotes")
+      );
+      await setDoc(reference, {
+        uid: auth.currentUser.uid,
+        date,
+        passage,
+        content,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+    }
+
+    resetWordNoteForm();
+    await loadWordNotes();
+    setMessage(
+      "word-note-message",
+      wasEditing
+        ? "말씀노트를 수정했습니다."
+        : "말씀노트를 저장했습니다.",
+      "success"
+    );
+  } catch {
+    setMessage(
+      "word-note-message",
+      "말씀노트를 저장하지 못했습니다. 다시 시도해주세요.",
+      "error"
+    );
+  } finally {
+    const button = document.getElementById("word-note-save-button");
+    button.disabled = false;
+    button.textContent = editingWordNoteId
+      ? "말씀노트 수정"
+      : "말씀노트 저장";
+  }
+}
+
+function editWordNote(noteId) {
+  const note = wordNoteCache.get(noteId);
+  if (!note || note.uid !== auth.currentUser?.uid) {
+    return;
+  }
+
+  editingWordNoteId = noteId;
+  document.getElementById("word-note-date").value = note.date;
+  document.getElementById("word-note-passage").value = note.passage || "";
+  document.getElementById("word-note-content").value = note.content;
+  document.getElementById("word-note-save-button").textContent =
+    "말씀노트 수정";
+  document.getElementById("word-note-cancel-button").hidden = false;
+  setMessage("word-note-message", "수정할 내용을 확인해주세요.");
+  document.getElementById("word-note-content").focus();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+async function deleteWordNote(noteId) {
+  const note = wordNoteCache.get(noteId);
+  if (
+    !note ||
+    note.uid !== auth.currentUser?.uid ||
+    !window.confirm("이 말씀노트를 삭제하시겠습니까?")
+  ) {
+    return;
+  }
+
+  try {
+    await deleteDoc(
+      doc(db, "users", auth.currentUser.uid, "wordNotes", noteId)
+    );
+    if (editingWordNoteId === noteId) {
+      resetWordNoteForm();
+    }
+    await loadWordNotes();
+    setMessage("word-note-message", "말씀노트를 삭제했습니다.", "success");
+  } catch {
+    setMessage(
+      "word-note-message",
+      "말씀노트를 삭제하지 못했습니다.",
+      "error"
+    );
+  }
+}
+
+async function openWordNotes() {
+  if (!auth.currentUser || currentUserProfile?.approved !== true) {
+    showScreen("login-screen", { historyMode: "replace" });
+    return;
+  }
+
+  showScreen("note-screen");
+  resetWordNoteForm();
+  setMessage("word-note-message", "말씀노트를 불러오는 중입니다.");
+
+  try {
+    await loadWordNotes();
+    setMessage("word-note-message", "");
+  } catch {
+    setMessage(
+      "word-note-message",
+      "말씀노트를 불러오지 못했습니다. 다시 시도해주세요.",
+      "error"
+    );
+  }
+}
+
 function isCurrentUserApprovedAdmin() {
   return Boolean(
     auth.currentUser &&
@@ -2143,6 +2387,9 @@ window.toggleBibleCheck = toggleBibleCheck;
 window.openMemoryCheck = openMemoryCheck;
 window.toggleMemoryCheck = toggleMemoryCheck;
 window.openPrayer = openPrayer;
+window.openWordNotes = openWordNotes;
+window.saveWordNote = saveWordNote;
+window.resetWordNoteForm = resetWordNoteForm;
 window.showPrayerTab = showPrayerTab;
 window.savePrivatePrayer = savePrivatePrayer;
 window.resetPrivatePrayerForm = resetPrivatePrayerForm;
