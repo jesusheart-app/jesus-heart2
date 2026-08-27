@@ -1342,6 +1342,28 @@
             <button id="word-room-invite-button" class="primary-button" type="button" onclick="inviteWordRoomMember()">회원 초대</button>
           </div>
         </div>
+
+        <div id="word-room-plan-form-section" class="page-card" hidden>
+          <h2>말씀 계획 설정</h2>
+          <p>날짜별로 함께 읽을 말씀을 정해주세요.</p>
+          <div class="word-room-plan-form">
+            <label for="word-room-plan-date">읽는 날짜</label>
+            <input id="word-room-plan-date" type="date">
+            <label for="word-room-plan-passage">읽을 말씀</label>
+            <input id="word-room-plan-passage" type="text" maxlength="120" placeholder="예: 요한복음 1장">
+            <label for="word-room-plan-note">안내 (선택)</label>
+            <textarea id="word-room-plan-note" maxlength="500" rows="3" placeholder="함께 나누고 싶은 안내를 적어주세요"></textarea>
+            <button id="word-room-plan-save-button" class="primary-button" type="button" onclick="saveWordRoomPlan()">말씀 계획 추가</button>
+            <button id="word-room-plan-cancel-button" class="secondary-button" type="button" onclick="resetWordRoomPlanForm()" hidden>수정 취소</button>
+            <div id="word-room-plan-message" class="start-message word-room-message" aria-live="polite"></div>
+          </div>
+        </div>
+
+        <div class="page-card">
+          <h2>날짜별 말씀 계획</h2>
+          <div id="word-room-plan-list" class="word-room-plan-list"></div>
+        </div>
+
         <div class="page-card">
           <h2>참여자</h2>
           <div id="word-room-member-list" class="word-room-member-list"></div>

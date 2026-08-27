@@ -1354,3 +1354,12 @@
     .word-room-member-role { display: inline-block; margin-left: 8px; color: #81786D; font-size: 13px; font-weight: 700; }
     .word-room-member-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     .word-room-member-button { min-height: 42px; margin: 0; padding: 8px; font-size: 13px; }
+
+    .word-room-plan-form, .word-room-plan-list { display: grid; gap: 10px; margin-top: 16px; }
+    .word-room-plan-form label { color: #443C34; font-size: 14px; font-weight: 700; }
+    .word-room-plan-form input, .word-room-plan-form textarea { width: 100%; padding: 12px 14px; border: 1px solid #DDD3C7; border-radius: 14px; background: #FCFBF8; color: #443C34; font: inherit; }
+    .word-room-plan-card { padding: 16px; border: 1px solid #E5DDD2; border-radius: 14px; background: #FCFBF8; }
+    .word-room-plan-card strong { color: #81786D; font-size: 13px; }
+    .word-room-plan-card h3 { margin: 7px 0; color: #443C34; }
+    .word-room-plan-card p { margin: 8px 0 0 !important; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .word-room-plan-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
