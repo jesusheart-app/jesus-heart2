@@ -52,6 +52,8 @@ let currentWordRoomId = null;
 let currentWordRoomMembers = new Map();
 let wordRoomPlanCache = new Map();
 let editingWordRoomPlanId = null;
+let wordRoomPlans = [];
+let showAllWordRoomPlans = false;
 
 const communityPrayerReactionTypes = [
   { key: "prayer", countField: "reactionPrayerCount", emoji: "🙏", label: "기도할게요" },
@@ -3254,26 +3256,50 @@ function resetWordRoomPlanForm() {
   setMessage("word-room-plan-message", "");
 }
 
-function renderWordRoomPlans(documents, room) {
+function localDateKey(date) {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0")
+  ].join("-");
+}
+
+function renderWordRoomPlans(plans, room) {
   const list = document.getElementById("word-room-plan-list");
   list.replaceChildren();
-  wordRoomPlanCache = new Map();
+  wordRoomPlanCache = new Map(plans.map((plan) => [plan.id, plan]));
+  const today = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
+  const todayKey = localDateKey(today);
+  const tomorrowKey = localDateKey(tomorrow);
+  const visiblePlans = showAllWordRoomPlans
+    ? plans
+    : plans.filter((plan) => [todayKey, tomorrowKey].includes(plan.date));
 
-  if (documents.length === 0) {
+  const toggleButton = document.getElementById("word-room-plan-toggle-button");
+  toggleButton.hidden = plans.length === 0;
+  toggleButton.textContent = showAllWordRoomPlans
+    ? "오늘·내일만 보기"
+    : "전체 계획 보기";
+
+  if (visiblePlans.length === 0) {
     const empty = document.createElement("p");
     empty.className = "word-room-empty";
-    empty.textContent = "등록된 말씀 계획이 없습니다.";
+    empty.textContent = plans.length === 0
+      ? "등록된 말씀 계획이 없습니다."
+      : "오늘과 내일 등록된 말씀 계획이 없습니다.";
     list.append(empty);
     return;
   }
 
-  documents.forEach((planDocument) => {
-    const plan = { id: planDocument.id, ...planDocument.data() };
-    wordRoomPlanCache.set(plan.id, plan);
+  visiblePlans.forEach((plan) => {
     const card = document.createElement("article");
     card.className = "word-room-plan-card";
     const date = document.createElement("strong");
-    date.textContent = new Date(plan.date + "T00:00:00").toLocaleDateString("ko-KR", {
+    const dayLabel = plan.date === todayKey ? "오늘 · " :
+      plan.date === tomorrowKey ? "내일 · " : "";
+    date.textContent = dayLabel + new Date(plan.date + "T00:00:00").toLocaleDateString("ko-KR", {
       year: "numeric", month: "long", day: "numeric", weekday: "short"
     });
     const passage = document.createElement("h3");
@@ -3304,9 +3330,20 @@ async function loadWordRoomPlans(room) {
     limit(100)
   );
   const snapshot = await getDocs(plansQuery);
-  renderWordRoomPlans(snapshot.docs, room);
+  wordRoomPlans = snapshot.docs.map((planDocument) => ({
+    id: planDocument.id,
+    ...planDocument.data()
+  }));
+  renderWordRoomPlans(wordRoomPlans, room);
   document.getElementById("word-room-plan-form-section").hidden =
     room.leaderUid !== auth.currentUser.uid;
+}
+
+function toggleWordRoomPlans() {
+  const room = wordRoomCache.get(currentWordRoomId);
+  if (!room) return;
+  showAllWordRoomPlans = !showAllWordRoomPlans;
+  renderWordRoomPlans(wordRoomPlans, room);
 }
 
 async function saveWordRoomPlan() {
@@ -3333,6 +3370,7 @@ async function saveWordRoomPlan() {
       });
     }
     resetWordRoomPlanForm();
+    showAllWordRoomPlans = true;
     await loadWordRoomPlans(room);
     setMessage("word-room-plan-message", wasEditing ? "말씀 계획을 수정했습니다." : "말씀 계획을 추가했습니다.", "success");
   } catch {
@@ -3373,6 +3411,7 @@ async function openWordRoom(roomId) {
   }
 
   currentWordRoomId = roomId;
+  showAllWordRoomPlans = false;
   document.getElementById("word-room-detail-name").textContent =
     room.name;
   document.getElementById("word-room-detail-description").textContent =
@@ -3808,6 +3847,7 @@ window.inviteWordRoomMember = inviteWordRoomMember;
 window.leaveWordRoom = leaveWordRoom;
 window.saveWordRoomPlan = saveWordRoomPlan;
 window.resetWordRoomPlanForm = resetWordRoomPlanForm;
+window.toggleWordRoomPlans = toggleWordRoomPlans;
 window.showGratitudeTab = showGratitudeTab;
 window.savePrivateGratitude = savePrivateGratitude;
 window.resetPrivateGratitudeForm = resetPrivateGratitudeForm;
