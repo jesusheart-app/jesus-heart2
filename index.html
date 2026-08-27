@@ -343,7 +343,7 @@
 
           <button
             class="menu-button"
-            onclick="showScreen('note-screen')"
+            onclick="openWordNotes()"
           >
             <span class="menu-icon">📝</span>
             <span class="menu-name">말씀노트</span>
@@ -832,12 +832,11 @@
 
       <header class="app-header">
 
-        <h1 class="header-title">
-          말씀노트
-        </h1>
+        <h1 class="header-title">말씀노트</h1>
 
         <button
           class="header-button"
+          type="button"
           onclick="goBackOrHome()"
         >
           ←
@@ -846,15 +845,78 @@
       </header>
 
 
-      <main class="page-content">
+      <main class="page-content word-note-content">
 
         <div class="page-card">
 
           <h2>나의 말씀노트</h2>
 
           <p>
-            나만의 묵상과 말씀 기록을 남겨보세요.
+            이곳의 기록은 본인만 볼 수 있습니다.
           </p>
+
+          <div class="word-note-form">
+
+            <label for="word-note-date">기록 날짜</label>
+
+            <input id="word-note-date" type="date">
+
+            <label for="word-note-passage">말씀 구절</label>
+
+            <input
+              id="word-note-passage"
+              type="text"
+              maxlength="120"
+              placeholder="예: 요한복음 3장 16절"
+            >
+
+            <label for="word-note-content">묵상 내용</label>
+
+            <textarea
+              id="word-note-content"
+              maxlength="5000"
+              rows="8"
+              placeholder="말씀을 읽으며 받은 마음을 기록하세요"
+            ></textarea>
+
+            <button
+              id="word-note-save-button"
+              class="primary-button"
+              type="button"
+              onclick="saveWordNote()"
+            >
+              말씀노트 저장
+            </button>
+
+            <button
+              id="word-note-cancel-button"
+              class="secondary-button word-note-cancel-button"
+              type="button"
+              onclick="resetWordNoteForm()"
+              hidden
+            >
+              수정 취소
+            </button>
+
+            <div
+              id="word-note-message"
+              class="start-message word-note-message"
+              aria-live="polite"
+            ></div>
+
+          </div>
+
+        </div>
+
+
+        <div class="page-card">
+
+          <h2>지난 말씀노트</h2>
+
+          <div
+            id="word-note-list"
+            class="word-note-list"
+          ></div>
 
         </div>
 

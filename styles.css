@@ -1039,3 +1039,93 @@
         min-height: 170px;
       }
     }
+
+
+    /* ========================================
+       말씀노트 데이터 뼈대
+    ======================================== */
+
+    .word-note-form {
+      display: grid;
+      gap: 10px;
+      margin-top: 22px;
+    }
+
+    .word-note-form label {
+      margin-top: 4px;
+      color: #443C34;
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .word-note-form input,
+    .word-note-form textarea {
+      width: 100%;
+      padding: 13px 14px;
+      border: 1px solid #DDD3C7;
+      border-radius: 14px;
+      background: #FCFBF8;
+      color: #443C34;
+      font: inherit;
+    }
+
+    .word-note-form input {
+      min-height: 52px;
+    }
+
+    .word-note-form textarea {
+      min-height: 180px;
+      line-height: 1.6;
+      resize: vertical;
+    }
+
+    .word-note-cancel-button {
+      margin-top: 0;
+    }
+
+    .word-note-message {
+      margin-top: 2px;
+      text-align: left;
+    }
+
+    .word-note-list {
+      display: grid;
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    .word-note-card {
+      padding: 18px;
+      border: 1px solid #E5DDD2;
+      border-radius: 16px;
+      background: #FCFBF8;
+    }
+
+    .word-note-date {
+      margin: 0 0 8px !important;
+      color: #81786D !important;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .word-note-passage {
+      margin: 0 0 10px;
+      color: #4E6B54;
+      font-size: 17px;
+    }
+
+    .word-note-text {
+      margin: 0 !important;
+      color: #51483F !important;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .word-note-empty {
+      margin: 0;
+      padding: 20px;
+      border-radius: 14px;
+      background: #F8F5EF;
+      color: #71685F;
+      text-align: center;
+    }
