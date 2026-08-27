@@ -818,6 +818,122 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /wordRooms/{roomId} {
+      allow read: if isApprovedMember()
+        && (
+          request.auth.uid in resource.data.memberUids
+          || isApprovedAdmin()
+        );
+
+      allow create: if isApprovedMember()
+        && request.resource.data.keys().hasOnly([
+          'name',
+          'description',
+          'createdBy',
+          'leaderUid',
+          'leaderName',
+          'memberUids',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 1
+        && request.resource.data.name.size() <= 60
+        && request.resource.data.description is string
+        && request.resource.data.description.size() <= 500
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.leaderUid == request.auth.uid
+        && request.resource.data.leaderName
+          == get(
+            /databases/$(database)/documents/users/$(request.auth.uid)
+          ).data.name
+        && request.resource.data.memberUids is list
+        && request.resource.data.memberUids.size() == 1
+        && request.resource.data.memberUids[0] == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+
+      allow update: if isApprovedMember()
+        && (
+          resource.data.leaderUid == request.auth.uid
+          || isApprovedAdmin()
+        )
+        && request.resource.data.keys().hasOnly([
+          'name',
+          'description',
+          'createdBy',
+          'leaderUid',
+          'leaderName',
+          'memberUids',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.leaderUid == resource.data.leaderUid
+        && request.resource.data.leaderName == resource.data.leaderName
+        && request.resource.data.memberUids == resource.data.memberUids
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 1
+        && request.resource.data.name.size() <= 60
+        && request.resource.data.description is string
+        && request.resource.data.description.size() <= 500
+        && request.resource.data.updatedAt == request.time;
+
+      allow delete: if isApprovedMember()
+        && (
+          resource.data.leaderUid == request.auth.uid
+          || isApprovedAdmin()
+        );
+    }
+
+    match /wordRooms/{roomId}/members/{uid} {
+      allow read: if isApprovedMember()
+        && (
+          exists(
+            /databases/$(database)/documents/wordRooms/$(roomId)
+          )
+          && (
+            request.auth.uid in get(
+              /databases/$(database)/documents/wordRooms/$(roomId)
+            ).data.memberUids
+            || isApprovedAdmin()
+          )
+        );
+
+      allow create: if isOwner(uid)
+        && isApprovedMember()
+        && getAfter(
+          /databases/$(database)/documents/wordRooms/$(roomId)
+        ).data.leaderUid == request.auth.uid
+        && request.resource.data.keys().hasOnly([
+          'uid',
+          'name',
+          'role',
+          'joinedAt'
+        ])
+        && request.resource.data.uid == uid
+        && request.resource.data.name
+          == get(
+            /databases/$(database)/documents/users/$(uid)
+          ).data.name
+        && request.resource.data.role == 'leader'
+        && request.resource.data.joinedAt == request.time;
+
+      allow update: if false;
+
+      allow delete: if isApprovedMember()
+        && (
+          get(
+            /databases/$(database)/documents/wordRooms/$(roomId)
+          ).data.leaderUid == request.auth.uid
+          || isApprovedAdmin()
+        )
+        && !existsAfter(
+          /databases/$(database)/documents/wordRooms/$(roomId)
+        );
+    }
+
     match /loginNames/{nameHash}/members/{uid} {
       allow read: if true;
 

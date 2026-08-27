@@ -1245,3 +1245,105 @@
       color: #71685F;
       text-align: center;
     }
+
+
+    /* ========================================
+       말씀방 1단계 뼈대
+    ======================================== */
+
+    .word-room-form {
+      display: grid;
+      gap: 10px;
+      margin-top: 22px;
+    }
+
+    .word-room-form label {
+      margin-top: 4px;
+      color: #443C34;
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .word-room-form input,
+    .word-room-form textarea {
+      width: 100%;
+      padding: 13px 14px;
+      border: 1px solid #DDD3C7;
+      border-radius: 14px;
+      background: #FCFBF8;
+      color: #443C34;
+      font: inherit;
+    }
+
+    .word-room-form input {
+      min-height: 52px;
+    }
+
+    .word-room-form textarea {
+      min-height: 110px;
+      line-height: 1.6;
+      resize: vertical;
+    }
+
+    .word-room-cancel-button {
+      margin-top: 0;
+    }
+
+    .word-room-message {
+      margin-top: 2px;
+      text-align: left;
+    }
+
+    .word-room-list {
+      display: grid;
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    .word-room-card {
+      padding: 18px;
+      border: 1px solid #E5DDD2;
+      border-radius: 16px;
+      background: #FCFBF8;
+    }
+
+    .word-room-card h3 {
+      margin: 0 0 8px;
+      color: #443C34;
+    }
+
+    .word-room-description {
+      margin: 0 0 10px !important;
+      color: #51483F !important;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .word-room-meta,
+    .word-room-detail-meta {
+      margin: 0 !important;
+      color: #81786D !important;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .word-room-actions {
+      display: grid;
+      gap: 8px;
+      margin-top: 16px;
+    }
+
+    .word-room-action-button {
+      width: 100%;
+      min-height: 44px;
+      margin: 0;
+    }
+
+    .word-room-empty {
+      margin: 0;
+      padding: 20px;
+      border-radius: 14px;
+      background: #F8F5EF;
+      color: #71685F;
+      text-align: center;
+    }
