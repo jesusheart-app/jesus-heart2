@@ -228,6 +228,50 @@ service cloud.firestore {
       allow delete: if isOwner(uid);
     }
 
+    match /users/{uid}/gratitudes/{gratitudeId} {
+      allow read: if isOwner(uid);
+
+      allow create: if isOwner(uid)
+        && request.resource.data.keys().hasOnly([
+          'uid',
+          'date',
+          'content',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.uid == uid
+        && request.resource.data.date is string
+        && request.resource.data.date.matches(
+          '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+        )
+        && request.resource.data.content is string
+        && request.resource.data.content.size() >= 1
+        && request.resource.data.content.size() <= 2000
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+
+      allow update: if isOwner(uid)
+        && request.resource.data.keys().hasOnly([
+          'uid',
+          'date',
+          'content',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.date is string
+        && request.resource.data.date.matches(
+          '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+        )
+        && request.resource.data.content is string
+        && request.resource.data.content.size() >= 1
+        && request.resource.data.content.size() <= 2000
+        && request.resource.data.updatedAt == request.time;
+
+      allow delete: if isOwner(uid);
+    }
+
     match /users/{uid}/wordNotes/{noteId} {
       allow read: if isOwner(uid);
 
@@ -334,6 +378,50 @@ service cloud.firestore {
         );
 
       allow delete: if isOwner(uid);
+    }
+
+    match /communityGratitudes/{gratitudeId} {
+      allow read: if isApprovedMember();
+
+      allow create: if isApprovedMember()
+        && request.resource.data.keys().hasOnly([
+          'uid',
+          'authorDisplay',
+          'content',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.authorDisplay
+          == get(
+            /databases/$(database)/documents/users/$(request.auth.uid)
+          ).data.name
+        && request.resource.data.content is string
+        && request.resource.data.content.size() >= 1
+        && request.resource.data.content.size() <= 2000
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+
+      allow update: if isApprovedMember()
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly([
+          'uid',
+          'authorDisplay',
+          'content',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.authorDisplay
+          == resource.data.authorDisplay
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.content is string
+        && request.resource.data.content.size() >= 1
+        && request.resource.data.content.size() <= 2000
+        && request.resource.data.updatedAt == request.time;
+
+      allow delete: if isApprovedMember()
+        && resource.data.uid == request.auth.uid;
     }
 
     match /communityPrayers/{prayerId} {
