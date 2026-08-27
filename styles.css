@@ -1363,3 +1363,10 @@
     .word-room-plan-card h3 { margin: 7px 0; color: #443C34; }
     .word-room-plan-card p { margin: 8px 0 0 !important; white-space: pre-wrap; overflow-wrap: anywhere; }
     .word-room-plan-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+    .word-room-plan-comments { display: grid; gap: 10px; margin-top: 18px; padding-top: 16px; border-top: 1px solid #E5DDD2; }
+    .word-room-plan-comments textarea { width: 100%; padding: 12px 14px; border: 1px solid #DDD3C7; border-radius: 14px; background: white; font: inherit; }
+    .word-room-comment { padding: 13px; border-radius: 12px; background: #F8F5EF; }
+    .word-room-comment p { margin: 7px 0 !important; white-space: pre-wrap; }
+    .word-room-comment-reactions { display: flex; flex-wrap: wrap; gap: 6px; }
+    .word-room-reaction-button { min-height: 38px; margin: 0; padding: 7px 10px; font-size: 12px; }
+    .word-room-reaction-button.active { border-color: #A68563; background: #F0E5D8; }

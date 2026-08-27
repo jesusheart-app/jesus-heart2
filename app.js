@@ -3084,6 +3084,11 @@ async function deleteWordRoom(roomId) {
     const plansSnapshot = await getDocs(
       collection(db, "wordRooms", roomId, "plans")
     );
+    const planDescendants = [];
+    for (const plan of plansSnapshot.docs) {
+      const comments = await getDocs(collection(db, "wordRooms", roomId, "plans", plan.id, "comments"));
+      comments.docs.forEach((comment) => planDescendants.push(comment.ref));
+    }
     const batch = writeBatch(db);
 
     membersSnapshot.docs.forEach((memberDocument) => {
@@ -3092,6 +3097,7 @@ async function deleteWordRoom(roomId) {
     plansSnapshot.docs.forEach((planDocument) => {
       batch.delete(planDocument.ref);
     });
+    planDescendants.forEach((reference) => batch.delete(reference));
     batch.delete(roomReference);
     await batch.commit();
 
@@ -3315,8 +3321,100 @@ function renderWordRoomPlans(plans, room) {
       );
       card.append(actions);
     }
+    const comments = document.createElement("div");
+    comments.className = "word-room-plan-comments";
+    card.append(comments);
+    renderWordRoomPlanComments(room, plan, comments);
     list.append(card);
   });
+}
+
+async function toggleWordRoomCommentReaction(room, plan, comment, type, container) {
+  if (comment.uid === auth.currentUser.uid) return;
+  const commentRef = doc(db, "wordRooms", room.id, "plans", plan.id, "comments", comment.id);
+  const reactionRef = doc(db, "wordRooms", room.id, "plans", plan.id, "comments", comment.id, "privateReactions", auth.currentUser.uid);
+  try {
+    await runTransaction(db, async (transaction) => {
+      const [commentSnapshot, reactionSnapshot] = await Promise.all([
+        transaction.get(commentRef), transaction.get(reactionRef)
+      ]);
+      if (!commentSnapshot.exists()) throw new Error("Comment not found");
+      const current = reactionSnapshot.exists() ? reactionSnapshot.data() : { amen: false, grace: false };
+      const next = { amen: current.amen === true, grace: current.grace === true };
+      next[type] = !next[type];
+      const field = type === "amen" ? "reactionAmenCount" : "reactionGraceCount";
+      transaction.update(commentRef, {
+        [field]: Math.max(0, (commentSnapshot.data()[field] || 0) + (next[type] ? 1 : -1))
+      });
+      transaction.set(reactionRef, { ...next, updatedAt: serverTimestamp() });
+    });
+    await renderWordRoomPlanComments(room, plan, container);
+  } catch { setMessage("word-room-detail-message", "반응을 저장하지 못했습니다.", "error"); }
+}
+
+async function saveWordRoomPlanComment(room, plan, textarea, container) {
+  const content = textarea.value.trim();
+  if (!content || content.length > 1000) return;
+  try {
+    await setDoc(doc(collection(db, "wordRooms", room.id, "plans", plan.id, "comments")), {
+      uid: auth.currentUser.uid,
+      authorDisplay: currentUserProfile.name,
+      content,
+      reactionAmenCount: 0,
+      reactionGraceCount: 0,
+      createdAt: serverTimestamp()
+    });
+    textarea.value = "";
+    await renderWordRoomPlanComments(room, plan, container);
+  } catch { setMessage("word-room-detail-message", "말씀 나눔을 저장하지 못했습니다.", "error"); }
+}
+
+async function deleteWordRoomPlanComment(room, plan, comment, container) {
+  if (comment.uid !== auth.currentUser.uid || !window.confirm("이 말씀 나눔을 삭제하시겠습니까?")) return;
+  try {
+    const batch = writeBatch(db);
+    batch.delete(doc(db, "wordRooms", room.id, "plans", plan.id, "comments", comment.id));
+    await batch.commit();
+    await renderWordRoomPlanComments(room, plan, container);
+  } catch { setMessage("word-room-detail-message", "말씀 나눔을 삭제하지 못했습니다.", "error"); }
+}
+
+async function renderWordRoomPlanComments(room, plan, container) {
+  container.replaceChildren();
+  const snapshot = await getDocs(query(
+    collection(db, "wordRooms", room.id, "plans", plan.id, "comments"),
+    orderBy("createdAt", "asc"), limit(50)
+  ));
+  for (const item of snapshot.docs) {
+    const comment = { id: item.id, ...item.data() };
+    const row = document.createElement("article");
+    row.className = "word-room-comment";
+    const meta = document.createElement("strong");
+    meta.textContent = comment.authorDisplay;
+    const content = document.createElement("p");
+    content.textContent = comment.content;
+    const reactions = document.createElement("div");
+    reactions.className = "word-room-comment-reactions";
+    let mine = { amen: false, grace: false };
+    if (comment.uid !== auth.currentUser.uid) {
+      const mineSnapshot = await getDoc(doc(db, "wordRooms", room.id, "plans", plan.id, "comments", comment.id, "privateReactions", auth.currentUser.uid));
+      if (mineSnapshot.exists()) mine = mineSnapshot.data();
+    }
+    [["amen", "🙌 아멘", "reactionAmenCount"], ["grace", "❤️ 은혜받았어요", "reactionGraceCount"]].forEach(([type, label, field]) => {
+      const button = createPrayerActionButton(label + " " + (comment[field] || 0), "secondary-button word-room-reaction-button" + (mine[type] ? " active" : ""), () => toggleWordRoomCommentReaction(room, plan, comment, type, container));
+      button.disabled = comment.uid === auth.currentUser.uid;
+      reactions.append(button);
+    });
+    row.append(meta, content, reactions);
+    if (comment.uid === auth.currentUser.uid) row.append(createPrayerActionButton("삭제", "secondary-button word-room-member-button prayer-delete-button", () => deleteWordRoomPlanComment(room, plan, comment, container)));
+    container.append(row);
+  }
+  const textarea = document.createElement("textarea");
+  textarea.maxLength = 1000;
+  textarea.rows = 3;
+  textarea.placeholder = "은혜받은 말씀 한 구절과 나눔을 남겨주세요";
+  const button = createPrayerActionButton("말씀 나눔 남기기", "primary-button", () => saveWordRoomPlanComment(room, plan, textarea, container));
+  container.append(textarea, button);
 }
 
 async function loadWordRoomPlans(room) {
@@ -3392,7 +3490,11 @@ async function deleteWordRoomPlan(planId) {
   if (!plan || !room || room.leaderUid !== auth.currentUser.uid ||
       !window.confirm("이 말씀 계획을 삭제하시겠습니까?")) return;
   try {
-    await deleteDoc(doc(db, "wordRooms", room.id, "plans", planId));
+    const comments = await getDocs(collection(db, "wordRooms", room.id, "plans", planId, "comments"));
+    const batch = writeBatch(db);
+    comments.docs.forEach((comment) => batch.delete(comment.ref));
+    batch.delete(doc(db, "wordRooms", room.id, "plans", planId));
+    await batch.commit();
     await loadWordRoomPlans(room);
     setMessage("word-room-plan-message", "말씀 계획을 삭제했습니다.", "success");
   } catch {

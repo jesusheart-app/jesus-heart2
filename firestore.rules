@@ -1032,6 +1032,49 @@ service cloud.firestore {
         );
     }
 
+    match /wordRooms/{roomId}/plans/{planId}/comments/{commentId} {
+      allow read: if isApprovedMember()
+        && request.auth.uid in get(/databases/$(database)/documents/wordRooms/$(roomId)).data.memberUids;
+      allow create: if isApprovedMember()
+        && request.auth.uid in get(/databases/$(database)/documents/wordRooms/$(roomId)).data.memberUids
+        && request.resource.data.keys().hasOnly(['uid', 'authorDisplay', 'content', 'reactionAmenCount', 'reactionGraceCount', 'createdAt'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.authorDisplay == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.name
+        && request.resource.data.content is string
+        && request.resource.data.content.size() >= 1
+        && request.resource.data.content.size() <= 1000
+        && request.resource.data.reactionAmenCount == 0
+        && request.resource.data.reactionGraceCount == 0
+        && request.resource.data.createdAt == request.time;
+      allow update: if isApprovedMember()
+        && resource.data.uid != request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactionAmenCount', 'reactionGraceCount'])
+        && request.resource.data.reactionAmenCount == resource.data.reactionAmenCount
+          + (getAfter(/databases/$(database)/documents/wordRooms/$(roomId)/plans/$(planId)/comments/$(commentId)/privateReactions/$(request.auth.uid)).data.amen == true ? 1 : 0)
+          - (exists(/databases/$(database)/documents/wordRooms/$(roomId)/plans/$(planId)/comments/$(commentId)/privateReactions/$(request.auth.uid))
+            && get(/databases/$(database)/documents/wordRooms/$(roomId)/plans/$(planId)/comments/$(commentId)/privateReactions/$(request.auth.uid)).data.amen == true ? 1 : 0)
+        && request.resource.data.reactionGraceCount == resource.data.reactionGraceCount
+          + (getAfter(/databases/$(database)/documents/wordRooms/$(roomId)/plans/$(planId)/comments/$(commentId)/privateReactions/$(request.auth.uid)).data.grace == true ? 1 : 0)
+          - (exists(/databases/$(database)/documents/wordRooms/$(roomId)/plans/$(planId)/comments/$(commentId)/privateReactions/$(request.auth.uid))
+            && get(/databases/$(database)/documents/wordRooms/$(roomId)/plans/$(planId)/comments/$(commentId)/privateReactions/$(request.auth.uid)).data.grace == true ? 1 : 0);
+      allow delete: if isApprovedMember()
+        && (resource.data.uid == request.auth.uid
+          || !existsAfter(/databases/$(database)/documents/wordRooms/$(roomId)/plans/$(planId)));
+    }
+
+    match /wordRooms/{roomId}/plans/{planId}/comments/{commentId}/privateReactions/{uid} {
+      allow read: if isOwner(uid) && isApprovedMember();
+      allow create, update: if isOwner(uid)
+        && isApprovedMember()
+        && request.resource.data.keys().hasOnly(['amen', 'grace', 'updatedAt'])
+        && request.resource.data.amen is bool
+        && request.resource.data.grace is bool
+        && request.resource.data.updatedAt == request.time
+        && get(/databases/$(database)/documents/wordRooms/$(roomId)/plans/$(planId)/comments/$(commentId)).data.uid != uid;
+      allow delete: if isApprovedMember()
+        && !existsAfter(/databases/$(database)/documents/wordRooms/$(roomId)/plans/$(planId)/comments/$(commentId));
+    }
+
     match /loginNames/{nameHash}/members/{uid} {
       allow read: if true;
 
