@@ -352,7 +352,7 @@
 
           <button
             class="menu-button"
-            onclick="showScreen('thanks-screen')"
+            onclick="openGratitude()"
           >
             <span class="menu-icon">🌿</span>
             <span class="menu-name">감사나눔</span>
@@ -933,12 +933,11 @@
 
       <header class="app-header">
 
-        <h1 class="header-title">
-          감사나눔
-        </h1>
+        <h1 class="header-title">감사나눔</h1>
 
         <button
           class="header-button"
+          type="button"
           onclick="goBackOrHome()"
         >
           ←
@@ -947,17 +946,167 @@
       </header>
 
 
-      <main class="page-content">
+      <main class="page-content gratitude-content">
 
-        <div class="page-card">
+        <div class="gratitude-tabs" role="tablist" aria-label="감사 공간 선택">
 
-          <h2>감사나눔</h2>
+          <button
+            id="private-gratitude-tab"
+            class="gratitude-tab active"
+            type="button"
+            role="tab"
+            aria-selected="true"
+            onclick="showGratitudeTab('private')"
+          >
+            나의 감사기록
+          </button>
 
-          <p>
-            오늘 하나님께 감사한 일을 기록하고 나눠보세요.
-          </p>
+          <button
+            id="community-gratitude-tab"
+            class="gratitude-tab"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            onclick="showGratitudeTab('community')"
+          >
+            함께 감사해요
+          </button>
 
         </div>
+
+
+        <section id="private-gratitude-panel" class="gratitude-panel">
+
+          <div class="page-card">
+
+            <h2>나의 감사 기록</h2>
+
+            <p>이곳의 기록은 본인만 볼 수 있습니다.</p>
+
+            <div class="gratitude-form">
+
+              <label for="private-gratitude-date">기록 날짜</label>
+
+              <input id="private-gratitude-date" type="date">
+
+              <label for="private-gratitude-content">감사 내용</label>
+
+              <textarea
+                id="private-gratitude-content"
+                maxlength="2000"
+                rows="6"
+                placeholder="오늘 감사한 일을 기록하세요"
+              ></textarea>
+
+              <button
+                id="private-gratitude-save-button"
+                class="primary-button"
+                type="button"
+                onclick="savePrivateGratitude()"
+              >
+                감사 기록 저장
+              </button>
+
+              <button
+                id="private-gratitude-cancel-button"
+                class="secondary-button gratitude-cancel-button"
+                type="button"
+                onclick="resetPrivateGratitudeForm()"
+                hidden
+              >
+                수정 취소
+              </button>
+
+              <div
+                id="private-gratitude-message"
+                class="start-message gratitude-message"
+                aria-live="polite"
+              ></div>
+
+            </div>
+
+          </div>
+
+
+          <div class="page-card">
+
+            <h2>지난 감사기록</h2>
+
+            <div
+              id="private-gratitude-list"
+              class="gratitude-list"
+            ></div>
+
+          </div>
+
+        </section>
+
+
+        <section
+          id="community-gratitude-panel"
+          class="gratitude-panel"
+          hidden
+        >
+
+          <div class="page-card">
+
+            <h2>감사 나누기</h2>
+
+            <p>서로의 감사를 나누며 함께 기뻐해요.</p>
+
+            <div class="gratitude-form">
+
+              <label for="community-gratitude-content">감사 내용</label>
+
+              <textarea
+                id="community-gratitude-content"
+                maxlength="2000"
+                rows="6"
+                placeholder="함께 나눌 감사 내용을 입력하세요"
+              ></textarea>
+
+              <button
+                id="community-gratitude-save-button"
+                class="primary-button"
+                type="button"
+                onclick="saveCommunityGratitude()"
+              >
+                감사 나누기
+              </button>
+
+              <button
+                id="community-gratitude-cancel-button"
+                class="secondary-button gratitude-cancel-button"
+                type="button"
+                onclick="resetCommunityGratitudeForm()"
+                hidden
+              >
+                수정 취소
+              </button>
+
+              <div
+                id="community-gratitude-message"
+                class="start-message gratitude-message"
+                aria-live="polite"
+              ></div>
+
+            </div>
+
+          </div>
+
+
+          <div class="page-card">
+
+            <h2>함께 감사해요</h2>
+
+            <div
+              id="community-gratitude-list"
+              class="gratitude-list"
+            ></div>
+
+          </div>
+
+        </section>
 
       </main>
 

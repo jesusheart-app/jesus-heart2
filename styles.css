@@ -1129,3 +1129,119 @@
       color: #71685F;
       text-align: center;
     }
+
+
+    /* ========================================
+       감사나눔 데이터 뼈대
+    ======================================== */
+
+    .gratitude-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 18px;
+      padding: 6px;
+      border-radius: 16px;
+      background: #E9E0D2;
+    }
+
+    .gratitude-tab {
+      min-height: 48px;
+      padding: 10px;
+      border: 0;
+      border-radius: 12px;
+      background: transparent;
+      color: #6F655A;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .gratitude-tab.active {
+      background: #FFFFFF;
+      color: #443C34;
+      box-shadow: 0 3px 10px rgba(78, 66, 52, 0.08);
+    }
+
+    .gratitude-form {
+      display: grid;
+      gap: 10px;
+      margin-top: 22px;
+    }
+
+    .gratitude-form label {
+      margin-top: 4px;
+      color: #443C34;
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .gratitude-form input,
+    .gratitude-form textarea {
+      width: 100%;
+      padding: 13px 14px;
+      border: 1px solid #DDD3C7;
+      border-radius: 14px;
+      background: #FCFBF8;
+      color: #443C34;
+      font: inherit;
+    }
+
+    .gratitude-form input {
+      min-height: 52px;
+    }
+
+    .gratitude-form textarea {
+      min-height: 150px;
+      line-height: 1.6;
+      resize: vertical;
+    }
+
+    .gratitude-cancel-button {
+      margin-top: 0;
+    }
+
+    .gratitude-message {
+      margin-top: 2px;
+      text-align: left;
+    }
+
+    .gratitude-list {
+      display: grid;
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    .gratitude-card {
+      padding: 18px;
+      border: 1px solid #E5DDD2;
+      border-radius: 16px;
+      background: #FCFBF8;
+    }
+
+    .community-gratitude-card {
+      background: #FFFDF8;
+    }
+
+    .gratitude-date {
+      margin: 0 0 9px !important;
+      color: #81786D !important;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .gratitude-text {
+      margin: 0 !important;
+      color: #51483F !important;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .gratitude-empty {
+      margin: 0;
+      padding: 20px;
+      border-radius: 14px;
+      background: #F8F5EF;
+      color: #71685F;
+      text-align: center;
+    }
