@@ -23,6 +23,7 @@ import {
   serverTimestamp,
   setDoc,
   updateDoc,
+  where,
   writeBatch
 } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import { firebaseConfig } from "./firebase-config.js";
@@ -45,6 +46,9 @@ let privateGratitudeCache = new Map();
 let communityGratitudeCache = new Map();
 let editingPrivateGratitudeId = null;
 let editingCommunityGratitudeId = null;
+let wordRoomCache = new Map();
+let editingWordRoomId = null;
+let currentWordRoomId = null;
 
 const communityPrayerReactionTypes = [
   { key: "prayer", countField: "reactionPrayerCount", emoji: "🙏", label: "기도할게요" },
@@ -2831,6 +2835,300 @@ async function openGratitude() {
   }
 }
 
+function resetWordRoomForm() {
+  editingWordRoomId = null;
+  document.getElementById("word-room-name").value = "";
+  document.getElementById("word-room-description").value = "";
+  document.getElementById("word-room-save-button").textContent =
+    "말씀방 만들기";
+  document.getElementById("word-room-cancel-button").hidden = true;
+  setMessage("word-room-message", "");
+}
+
+function canManageWordRoom(room) {
+  return Boolean(
+    auth.currentUser &&
+    (
+      room.leaderUid === auth.currentUser.uid ||
+      currentUserProfile?.role === "admin"
+    )
+  );
+}
+
+function formatWordRoomMemberCount(room) {
+  const count = Array.isArray(room.memberUids)
+    ? room.memberUids.length
+    : 0;
+  return "참여자 " + count + "명";
+}
+
+function renderWordRooms(documents) {
+  const list = document.getElementById("word-room-list");
+  list.replaceChildren();
+  wordRoomCache = new Map();
+
+  const rooms = documents
+    .map((roomDocument) => ({
+      id: roomDocument.id,
+      ...roomDocument.data()
+    }))
+    .sort((first, second) => {
+      const firstTime = first.createdAt?.toMillis?.() || 0;
+      const secondTime = second.createdAt?.toMillis?.() || 0;
+      return secondTime - firstTime;
+    });
+
+  if (rooms.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "word-room-empty";
+    empty.textContent = "아직 참여 중인 말씀방이 없습니다.";
+    list.append(empty);
+    return;
+  }
+
+  rooms.forEach((room) => {
+    wordRoomCache.set(room.id, room);
+
+    const card = document.createElement("article");
+    card.className = "word-room-card";
+
+    const name = document.createElement("h3");
+    name.textContent = room.name;
+    card.append(name);
+
+    const description = document.createElement("p");
+    description.className = "word-room-description";
+    description.textContent = room.description || "방 설명이 없습니다.";
+    card.append(description);
+
+    const meta = document.createElement("p");
+    meta.className = "word-room-meta";
+    meta.textContent =
+      "방장 " + room.leaderName + " · " +
+      formatWordRoomMemberCount(room);
+    card.append(meta);
+
+    const actions = document.createElement("div");
+    actions.className = "word-room-actions";
+
+    actions.append(
+      createPrayerActionButton(
+        "방 열기",
+        "primary-button word-room-action-button",
+        () => openWordRoom(room.id)
+      )
+    );
+
+    if (canManageWordRoom(room)) {
+      actions.append(
+        createPrayerActionButton(
+          "방 정보 수정",
+          "secondary-button word-room-action-button",
+          () => editWordRoom(room.id)
+        ),
+        createPrayerActionButton(
+          "방 삭제",
+          "secondary-button word-room-action-button prayer-delete-button",
+          () => deleteWordRoom(room.id)
+        )
+      );
+    }
+
+    card.append(actions);
+    list.append(card);
+  });
+}
+
+async function loadWordRooms() {
+  const roomsQuery = query(
+    collection(db, "wordRooms"),
+    where("memberUids", "array-contains", auth.currentUser.uid)
+  );
+  const snapshot = await getDocs(roomsQuery);
+  renderWordRooms(snapshot.docs);
+}
+
+async function saveWordRoom() {
+  const name = document.getElementById("word-room-name").value.trim();
+  const description = document
+    .getElementById("word-room-description")
+    .value.trim();
+
+  if (!name || name.length > 60 || description.length > 500) {
+    setMessage(
+      "word-room-message",
+      "방 이름은 1~60자, 설명은 500자 이내로 입력해주세요.",
+      "error"
+    );
+    return;
+  }
+
+  const wasEditing = Boolean(editingWordRoomId);
+  setBusy(
+    "word-room-save-button",
+    true,
+    "저장 중...",
+    wasEditing ? "방 정보 수정" : "말씀방 만들기"
+  );
+
+  try {
+    if (editingWordRoomId) {
+      const room = wordRoomCache.get(editingWordRoomId);
+      if (!room || !canManageWordRoom(room)) {
+        throw new Error("Word room not found");
+      }
+
+      await updateDoc(doc(db, "wordRooms", editingWordRoomId), {
+        name,
+        description,
+        updatedAt: serverTimestamp()
+      });
+    } else {
+      const roomReference = doc(collection(db, "wordRooms"));
+      const memberReference = doc(
+        db,
+        "wordRooms",
+        roomReference.id,
+        "members",
+        auth.currentUser.uid
+      );
+      const batch = writeBatch(db);
+
+      batch.set(roomReference, {
+        name,
+        description,
+        createdBy: auth.currentUser.uid,
+        leaderUid: auth.currentUser.uid,
+        leaderName: currentUserProfile.name,
+        memberUids: [auth.currentUser.uid],
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+      batch.set(memberReference, {
+        uid: auth.currentUser.uid,
+        name: currentUserProfile.name,
+        role: "leader",
+        joinedAt: serverTimestamp()
+      });
+      await batch.commit();
+    }
+
+    resetWordRoomForm();
+    await loadWordRooms();
+    setMessage(
+      "word-room-message",
+      wasEditing ? "말씀방 정보를 수정했습니다." : "말씀방을 만들었습니다.",
+      "success"
+    );
+  } catch {
+    setMessage(
+      "word-room-message",
+      "말씀방을 저장하지 못했습니다. 다시 시도해주세요.",
+      "error"
+    );
+  } finally {
+    const button = document.getElementById("word-room-save-button");
+    button.disabled = false;
+    button.textContent = editingWordRoomId
+      ? "방 정보 수정"
+      : "말씀방 만들기";
+  }
+}
+
+function editWordRoom(roomId) {
+  const room = wordRoomCache.get(roomId);
+  if (!room || !canManageWordRoom(room)) {
+    return;
+  }
+
+  editingWordRoomId = roomId;
+  document.getElementById("word-room-name").value = room.name;
+  document.getElementById("word-room-description").value =
+    room.description || "";
+  document.getElementById("word-room-save-button").textContent =
+    "방 정보 수정";
+  document.getElementById("word-room-cancel-button").hidden = false;
+  setMessage("word-room-message", "수정할 방 정보를 확인해주세요.");
+  document.getElementById("word-room-name").focus();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+async function deleteWordRoom(roomId) {
+  const room = wordRoomCache.get(roomId);
+  if (
+    !room ||
+    !canManageWordRoom(room) ||
+    !window.confirm("이 말씀방을 삭제하시겠습니까?")
+  ) {
+    return;
+  }
+
+  try {
+    const roomReference = doc(db, "wordRooms", roomId);
+    const membersSnapshot = await getDocs(
+      collection(db, "wordRooms", roomId, "members")
+    );
+    const batch = writeBatch(db);
+
+    membersSnapshot.docs.forEach((memberDocument) => {
+      batch.delete(memberDocument.ref);
+    });
+    batch.delete(roomReference);
+    await batch.commit();
+
+    if (editingWordRoomId === roomId) {
+      resetWordRoomForm();
+    }
+    await loadWordRooms();
+    setMessage("word-room-message", "말씀방을 삭제했습니다.", "success");
+  } catch {
+    setMessage(
+      "word-room-message",
+      "말씀방을 삭제하지 못했습니다.",
+      "error"
+    );
+  }
+}
+
+function openWordRoom(roomId) {
+  const room = wordRoomCache.get(roomId);
+  if (!room) {
+    return;
+  }
+
+  currentWordRoomId = roomId;
+  document.getElementById("word-room-detail-name").textContent =
+    room.name;
+  document.getElementById("word-room-detail-description").textContent =
+    room.description || "방 설명이 없습니다.";
+  document.getElementById("word-room-detail-meta").textContent =
+    "방장 " + room.leaderName + " · " +
+    formatWordRoomMemberCount(room);
+  showScreen("word-room-detail-screen");
+}
+
+async function openWordRooms() {
+  if (!auth.currentUser || currentUserProfile?.approved !== true) {
+    showScreen("login-screen", { historyMode: "replace" });
+    return;
+  }
+
+  showScreen("rooms-screen");
+  resetWordRoomForm();
+  setMessage("word-room-message", "말씀방을 불러오는 중입니다.");
+
+  try {
+    await loadWordRooms();
+    setMessage("word-room-message", "");
+  } catch {
+    setMessage(
+      "word-room-message",
+      "말씀방을 불러오지 못했습니다. 다시 시도해주세요.",
+      "error"
+    );
+  }
+}
+
 function isCurrentUserApprovedAdmin() {
   return Boolean(
     auth.currentUser &&
@@ -3219,6 +3517,10 @@ window.toggleMemoryCheck = toggleMemoryCheck;
 window.openPrayer = openPrayer;
 window.openWordNotes = openWordNotes;
 window.openGratitude = openGratitude;
+window.openWordRooms = openWordRooms;
+window.openWordRoom = openWordRoom;
+window.saveWordRoom = saveWordRoom;
+window.resetWordRoomForm = resetWordRoomForm;
 window.showGratitudeTab = showGratitudeTab;
 window.savePrivateGratitude = savePrivateGratitude;
 window.resetPrivateGratitudeForm = resetPrivateGratitudeForm;
