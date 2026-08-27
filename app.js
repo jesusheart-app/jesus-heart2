@@ -54,6 +54,8 @@ let wordRoomPlanCache = new Map();
 let editingWordRoomPlanId = null;
 let wordRoomPlans = [];
 let showAllWordRoomPlans = false;
+let newsCache = new Map();
+let editingNewsId = null;
 
 const communityPrayerReactionTypes = [
   { key: "prayer", countField: "reactionPrayerCount", emoji: "🙏", label: "기도할게요" },
@@ -271,6 +273,7 @@ async function routeAuthenticatedUser(user) {
 
   document.getElementById("welcome-name").textContent =
     `${profile.name}님, 반갑습니다.`;
+  applyFontSize(profile.settings?.fontSize || "normal");
   showScreen("home-screen", { historyMode: "replace" });
 }
 
@@ -463,6 +466,7 @@ async function logout() {
     await signOut(auth);
   } finally {
     document.getElementById("login-password").value = "";
+    applyFontSize("normal");
     setMessage("login-message", "");
     showScreen("login-screen", { historyMode: "replace" });
   }
@@ -3549,6 +3553,232 @@ async function openWordRooms() {
   }
 }
 
+function applyFontSize(fontSize) {
+  const allowed = ["small", "normal", "large", "extra-large"];
+  document.body.dataset.fontSize = allowed.includes(fontSize)
+    ? fontSize
+    : "normal";
+}
+
+function resetNewsForm() {
+  editingNewsId = null;
+  document.getElementById("news-title").value = "";
+  document.getElementById("news-event-date").value = "";
+  document.getElementById("news-content").value = "";
+  document.getElementById("news-pinned").checked = false;
+  document.getElementById("news-save-button").textContent = "교회소식 등록";
+  document.getElementById("news-cancel-button").hidden = true;
+  setMessage("news-admin-message", "");
+}
+
+function renderNews(documents) {
+  const list = document.getElementById("news-list");
+  list.replaceChildren();
+  newsCache = new Map();
+  const newsItems = documents
+    .map((newsDocument) => ({ id: newsDocument.id, ...newsDocument.data() }))
+    .sort((first, second) => {
+      if (first.pinned !== second.pinned) return first.pinned ? -1 : 1;
+      return (second.createdAt?.toMillis?.() || 0) -
+        (first.createdAt?.toMillis?.() || 0);
+    });
+
+  if (newsItems.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "news-empty";
+    empty.textContent = "등록된 교회소식이 없습니다.";
+    list.append(empty);
+    return;
+  }
+
+  newsItems.forEach((news) => {
+    newsCache.set(news.id, news);
+    const card = document.createElement("article");
+    card.className = "news-card" + (news.pinned ? " pinned" : "");
+    if (news.pinned) {
+      const pin = document.createElement("span");
+      pin.className = "news-pin-badge";
+      pin.textContent = "중요";
+      card.append(pin);
+    }
+    const title = document.createElement("h3");
+    title.textContent = news.title;
+    card.append(title);
+    if (news.eventDate) {
+      const eventDate = document.createElement("p");
+      eventDate.className = "news-event-date";
+      eventDate.textContent = "일정 · " + new Date(news.eventDate + "T00:00:00")
+        .toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric", weekday: "short" });
+      card.append(eventDate);
+    }
+    const content = document.createElement("p");
+    content.className = "news-card-content";
+    content.textContent = news.content;
+    card.append(content);
+    const meta = document.createElement("p");
+    meta.className = "news-card-meta";
+    meta.textContent = news.authorName + " · " + formatPrayerDate(news.createdAt);
+    card.append(meta);
+    if (isCurrentUserApprovedAdmin()) {
+      const actions = document.createElement("div");
+      actions.className = "news-card-actions";
+      actions.append(
+        createPrayerActionButton("수정", "secondary-button prayer-small-button", () => editNews(news.id)),
+        createPrayerActionButton("삭제", "secondary-button prayer-small-button prayer-delete-button", () => deleteNews(news.id))
+      );
+      card.append(actions);
+    }
+    list.append(card);
+  });
+}
+
+async function loadNews() {
+  const snapshot = await getDocs(query(
+    collection(db, "churchNews"),
+    orderBy("createdAt", "desc"),
+    limit(50)
+  ));
+  renderNews(snapshot.docs);
+}
+
+async function openNews() {
+  if (!auth.currentUser || currentUserProfile?.approved !== true) {
+    showScreen("login-screen", { historyMode: "replace" });
+    return;
+  }
+  showScreen("news-screen");
+  document.getElementById("news-admin-form-card").hidden =
+    !isCurrentUserApprovedAdmin();
+  resetNewsForm();
+  setMessage("news-message", "교회소식을 불러오는 중입니다.");
+  try {
+    await loadNews();
+    setMessage("news-message", "");
+  } catch {
+    setMessage("news-message", "교회소식을 불러오지 못했습니다.", "error");
+  }
+}
+
+async function saveNews() {
+  if (!isCurrentUserApprovedAdmin()) return;
+  const title = document.getElementById("news-title").value.trim();
+  const eventDate = document.getElementById("news-event-date").value;
+  const content = document.getElementById("news-content").value.trim();
+  const pinned = document.getElementById("news-pinned").checked;
+  if (!title || title.length > 80 || !content || content.length > 2000) {
+    setMessage("news-admin-message", "제목과 내용을 확인해주세요.", "error");
+    return;
+  }
+  const wasEditing = Boolean(editingNewsId);
+  try {
+    if (wasEditing) {
+      await updateDoc(doc(db, "churchNews", editingNewsId), {
+        title, eventDate, content, pinned, updatedAt: serverTimestamp()
+      });
+    } else {
+      await setDoc(doc(collection(db, "churchNews")), {
+        title, eventDate, content, pinned,
+        authorUid: auth.currentUser.uid,
+        authorName: currentUserProfile.name,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+    }
+    resetNewsForm();
+    await loadNews();
+    setMessage("news-admin-message", wasEditing ? "교회소식을 수정했습니다." : "교회소식을 등록했습니다.", "success");
+  } catch {
+    setMessage("news-admin-message", "교회소식을 저장하지 못했습니다.", "error");
+  }
+}
+
+function editNews(newsId) {
+  const news = newsCache.get(newsId);
+  if (!news || !isCurrentUserApprovedAdmin()) return;
+  editingNewsId = newsId;
+  document.getElementById("news-title").value = news.title;
+  document.getElementById("news-event-date").value = news.eventDate || "";
+  document.getElementById("news-content").value = news.content;
+  document.getElementById("news-pinned").checked = news.pinned === true;
+  document.getElementById("news-save-button").textContent = "교회소식 수정";
+  document.getElementById("news-cancel-button").hidden = false;
+  document.getElementById("news-title").focus();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+async function deleteNews(newsId) {
+  const news = newsCache.get(newsId);
+  if (!news || !isCurrentUserApprovedAdmin() ||
+      !window.confirm("이 교회소식을 삭제하시겠습니까?")) return;
+  try {
+    await deleteDoc(doc(db, "churchNews", newsId));
+    if (editingNewsId === newsId) resetNewsForm();
+    await loadNews();
+    setMessage("news-admin-message", "교회소식을 삭제했습니다.", "success");
+  } catch {
+    setMessage("news-admin-message", "교회소식을 삭제하지 못했습니다.", "error");
+  }
+}
+
+function formatProfileDate(createdAt) {
+  if (!createdAt || typeof createdAt.toDate !== "function") return "확인 중";
+  return createdAt.toDate().toLocaleDateString("ko-KR", {
+    year: "numeric", month: "long", day: "numeric"
+  });
+}
+
+function calculateDaysTogether(createdAt) {
+  if (!createdAt || typeof createdAt.toDate !== "function") return "-";
+  const start = createdAt.toDate();
+  const today = new Date();
+  const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  const todayDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  return Math.max(1, Math.floor((todayDay - startDay) / 86400000) + 1);
+}
+
+function openMyPage() {
+  if (!auth.currentUser || currentUserProfile?.approved !== true) {
+    showScreen("login-screen", { historyMode: "replace" });
+    return;
+  }
+  document.getElementById("mypage-name").textContent = currentUserProfile.name;
+  document.getElementById("mypage-member-id").textContent = currentUserProfile.memberId || "-";
+  document.getElementById("mypage-role").textContent =
+    currentUserProfile.role === "admin" ? "관리자" : "일반회원";
+  document.getElementById("mypage-created-at").textContent =
+    formatProfileDate(currentUserProfile.createdAt);
+  const daysTogether = calculateDaysTogether(currentUserProfile.createdAt);
+  document.getElementById("mypage-days").textContent =
+    daysTogether === "-" ? "-" : daysTogether + "일";
+  document.getElementById("mypage-font-size").value =
+    currentUserProfile.settings?.fontSize || "normal";
+  setMessage("mypage-settings-message", "");
+  showScreen("mypage-screen");
+}
+
+async function saveMyPageSettings() {
+  if (!auth.currentUser || currentUserProfile?.approved !== true) return;
+  const fontSize = document.getElementById("mypage-font-size").value;
+  if (!["small", "normal", "large", "extra-large"].includes(fontSize)) return;
+  const button = document.getElementById("mypage-settings-save-button");
+  setBusy(button.id, true, "저장 중...", "설정 저장");
+  try {
+    const settings = {
+      fontSize,
+      notifications: currentUserProfile.settings?.notifications === true
+    };
+    await updateDoc(doc(db, "users", auth.currentUser.uid), { settings });
+    currentUserProfile = { ...currentUserProfile, settings };
+    applyFontSize(fontSize);
+    setMessage("mypage-settings-message", "글씨 크기를 저장했습니다.", "success");
+  } catch {
+    setMessage("mypage-settings-message", "설정을 저장하지 못했습니다.", "error");
+  } finally {
+    button.disabled = false;
+    button.textContent = "설정 저장";
+  }
+}
+
 function isCurrentUserApprovedAdmin() {
   return Boolean(
     auth.currentUser &&
@@ -3895,6 +4125,7 @@ onAuthStateChanged(auth, async (user) => {
 
   if (!user) {
     currentUserProfile = null;
+    applyFontSize("normal");
     const adminHomeButton = document.getElementById("admin-home-button");
     if (adminHomeButton) {
       adminHomeButton.hidden = true;
@@ -3938,6 +4169,11 @@ window.openPrayer = openPrayer;
 window.openWordNotes = openWordNotes;
 window.openGratitude = openGratitude;
 window.openWordRooms = openWordRooms;
+window.openNews = openNews;
+window.saveNews = saveNews;
+window.resetNewsForm = resetNewsForm;
+window.openMyPage = openMyPage;
+window.saveMyPageSettings = saveMyPageSettings;
 window.openWordRoom = openWordRoom;
 window.saveWordRoom = saveWordRoom;
 window.resetWordRoomForm = resetWordRoomForm;

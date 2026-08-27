@@ -299,7 +299,7 @@
         <button
           class="header-button"
           type="button"
-          onclick="showScreen('mypage-screen')"
+          onclick="openMyPage()"
           aria-label="마이페이지"
         >
           ☺
@@ -381,7 +381,7 @@
 
         <button
           class="news-button"
-          onclick="showScreen('news-screen')"
+          onclick="openNews()"
         >
           ⛪ 교회소식
         </button>
@@ -423,7 +423,7 @@
 
           <button
             class="nav-button"
-            onclick="showScreen('mypage-screen')"
+            onclick="openMyPage()"
           >
             <span class="nav-icon">☺</span>
             마이페이지
@@ -1323,7 +1323,7 @@
 
           <button
             id="word-room-leave-button"
-            class="secondary-button prayer-delete-button"
+            class="secondary-button word-room-leave-button"
             type="button"
             onclick="leaveWordRoom()"
             hidden
@@ -1398,15 +1398,46 @@
       </header>
 
 
-      <main class="page-content">
+      <main class="page-content news-content">
+
+        <div id="news-admin-form-card" class="page-card" hidden>
+
+          <h2>교회소식 작성</h2>
+
+          <div class="news-form">
+
+            <label for="news-title">제목</label>
+            <input id="news-title" type="text" maxlength="80" placeholder="소식 제목을 입력해주세요">
+
+            <label for="news-event-date">일정 날짜 (선택)</label>
+            <input id="news-event-date" type="date">
+
+            <label for="news-content">내용</label>
+            <textarea id="news-content" maxlength="2000" rows="6" placeholder="교회 일정이나 전달사항을 입력해주세요"></textarea>
+
+            <label class="news-pin-label">
+              <input id="news-pinned" type="checkbox">
+              중요한 소식으로 상단에 고정
+            </label>
+
+            <button id="news-save-button" class="primary-button" type="button" onclick="saveNews()">교회소식 등록</button>
+            <button id="news-cancel-button" class="secondary-button" type="button" onclick="resetNewsForm()" hidden>수정 취소</button>
+            <div id="news-admin-message" class="start-message" aria-live="polite"></div>
+
+          </div>
+
+        </div>
 
         <div class="page-card">
 
           <h2>교회소식</h2>
 
           <p>
-            교회 일정과 전달사항을 확인하는 공간입니다.
+            교회 일정과 전달사항을 확인해 주세요.
           </p>
+
+          <div id="news-list" class="news-list"></div>
+          <div id="news-message" class="start-message" aria-live="polite"></div>
 
         </div>
 
@@ -1437,15 +1468,18 @@
       </header>
 
 
-      <main class="page-content">
+      <main class="page-content mypage-content">
 
         <div class="page-card">
 
           <h2>내 정보</h2>
 
-          <p>
-            이름과 회원 정보를 확인할 수 있습니다.
-          </p>
+          <dl class="mypage-profile-list">
+            <div><dt>이름</dt><dd id="mypage-name">-</dd></div>
+            <div><dt>회원번호</dt><dd id="mypage-member-id">-</dd></div>
+            <div><dt>회원 구분</dt><dd id="mypage-role">-</dd></div>
+            <div><dt>가입일</dt><dd id="mypage-created-at">-</dd></div>
+          </dl>
 
         </div>
 
@@ -1454,9 +1488,8 @@
 
           <h2>예수마음과 함께한 날</h2>
 
-          <p>
-            0일
-          </p>
+          <p id="mypage-days" class="mypage-days">-일</p>
+          <p class="mypage-days-guide">가입한 날부터 오늘까지 함께한 날입니다.</p>
 
         </div>
 
@@ -1465,9 +1498,19 @@
 
           <h2>환경설정</h2>
 
-          <p>
-            글씨 크기와 알림 설정을 관리합니다.
-          </p>
+          <div class="mypage-settings-form">
+            <label for="mypage-font-size">글씨 크기</label>
+            <select id="mypage-font-size">
+              <option value="small">작게</option>
+              <option value="normal">보통</option>
+              <option value="large">크게</option>
+              <option value="extra-large">아주 크게</option>
+            </select>
+            <button id="mypage-settings-save-button" class="primary-button" type="button" onclick="saveMyPageSettings()">설정 저장</button>
+            <div id="mypage-settings-message" class="start-message" aria-live="polite"></div>
+          </div>
+
+          <p class="mypage-notification-guide">알림 설정은 다음 통합 작업에서 연결합니다.</p>
 
         </div>
 
