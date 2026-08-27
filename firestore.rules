@@ -93,6 +93,79 @@ service cloud.firestore {
             - (hadAmenReaction(prayerId, uid) ? 1 : 0);
     }
 
+    function hadJoyReaction(gratitudeId, uid) {
+      return exists(
+          /databases/$(database)/documents/communityGratitudes/$(gratitudeId)/privateReactions/$(uid)
+        )
+        && get(
+          /databases/$(database)/documents/communityGratitudes/$(gratitudeId)/privateReactions/$(uid)
+        ).data.joy == true;
+    }
+
+    function hadThanksReaction(gratitudeId, uid) {
+      return exists(
+          /databases/$(database)/documents/communityGratitudes/$(gratitudeId)/privateReactions/$(uid)
+        )
+        && get(
+          /databases/$(database)/documents/communityGratitudes/$(gratitudeId)/privateReactions/$(uid)
+        ).data.thanks == true;
+    }
+
+    function hadGraceReaction(gratitudeId, uid) {
+      return exists(
+          /databases/$(database)/documents/communityGratitudes/$(gratitudeId)/privateReactions/$(uid)
+        )
+        && get(
+          /databases/$(database)/documents/communityGratitudes/$(gratitudeId)/privateReactions/$(uid)
+        ).data.grace == true;
+    }
+
+    function willHaveJoyReaction(gratitudeId, uid) {
+      return getAfter(
+        /databases/$(database)/documents/communityGratitudes/$(gratitudeId)/privateReactions/$(uid)
+      ).data.joy == true;
+    }
+
+    function willHaveThanksReaction(gratitudeId, uid) {
+      return getAfter(
+        /databases/$(database)/documents/communityGratitudes/$(gratitudeId)/privateReactions/$(uid)
+      ).data.thanks == true;
+    }
+
+    function willHaveGraceReaction(gratitudeId, uid) {
+      return getAfter(
+        /databases/$(database)/documents/communityGratitudes/$(gratitudeId)/privateReactions/$(uid)
+      ).data.grace == true;
+    }
+
+    function validGratitudeReactionCounts(gratitude) {
+      return gratitude.reactionJoyCount is int
+        && gratitude.reactionJoyCount >= 0
+        && gratitude.reactionThanksCount is int
+        && gratitude.reactionThanksCount >= 0
+        && gratitude.reactionGraceCount is int
+        && gratitude.reactionGraceCount >= 0;
+    }
+
+    function hasValidGratitudeReactionCountChange(
+      gratitudeId,
+      uid
+    ) {
+      return validGratitudeReactionCounts(request.resource.data)
+        && request.resource.data.reactionJoyCount
+          == resource.data.get('reactionJoyCount', 0)
+            + (willHaveJoyReaction(gratitudeId, uid) ? 1 : 0)
+            - (hadJoyReaction(gratitudeId, uid) ? 1 : 0)
+        && request.resource.data.reactionThanksCount
+          == resource.data.get('reactionThanksCount', 0)
+            + (willHaveThanksReaction(gratitudeId, uid) ? 1 : 0)
+            - (hadThanksReaction(gratitudeId, uid) ? 1 : 0)
+        && request.resource.data.reactionGraceCount
+          == resource.data.get('reactionGraceCount', 0)
+            + (willHaveGraceReaction(gratitudeId, uid) ? 1 : 0)
+            - (hadGraceReaction(gratitudeId, uid) ? 1 : 0);
+    }
+
     function hasValidSettings(settings) {
       return settings.keys().hasOnly(['fontSize', 'notifications'])
         && settings.fontSize in ['small', 'normal', 'large', 'extra-large']
@@ -388,6 +461,9 @@ service cloud.firestore {
           'uid',
           'authorDisplay',
           'content',
+          'reactionJoyCount',
+          'reactionThanksCount',
+          'reactionGraceCount',
           'createdAt',
           'updatedAt'
         ])
@@ -399,29 +475,151 @@ service cloud.firestore {
         && request.resource.data.content is string
         && request.resource.data.content.size() >= 1
         && request.resource.data.content.size() <= 2000
+        && request.resource.data.reactionJoyCount == 0
+        && request.resource.data.reactionThanksCount == 0
+        && request.resource.data.reactionGraceCount == 0
         && request.resource.data.createdAt == request.time
         && request.resource.data.updatedAt == request.time;
 
-      allow update: if isApprovedMember()
-        && resource.data.uid == request.auth.uid
+      allow update: if (
+          isApprovedMember()
+          && resource.data.uid == request.auth.uid
+          && request.resource.data.keys().hasOnly([
+            'uid',
+            'authorDisplay',
+            'content',
+            'reactionJoyCount',
+            'reactionThanksCount',
+            'reactionGraceCount',
+            'createdAt',
+            'updatedAt'
+          ])
+          && request.resource.data.uid == resource.data.uid
+          && request.resource.data.authorDisplay
+            == resource.data.authorDisplay
+          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.get('reactionJoyCount', 0)
+            == resource.data.get('reactionJoyCount', 0)
+          && request.resource.data.get('reactionThanksCount', 0)
+            == resource.data.get('reactionThanksCount', 0)
+          && request.resource.data.get('reactionGraceCount', 0)
+            == resource.data.get('reactionGraceCount', 0)
+          && request.resource.data.content is string
+          && request.resource.data.content.size() >= 1
+          && request.resource.data.content.size() <= 2000
+          && request.resource.data.updatedAt == request.time
+        ) || (
+          isApprovedMember()
+          && resource.data.uid != request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly([
+              'reactionJoyCount',
+              'reactionThanksCount',
+              'reactionGraceCount'
+            ])
+          && hasValidGratitudeReactionCountChange(
+            gratitudeId,
+            request.auth.uid
+          )
+        );
+
+      allow delete: if isApprovedMember()
+        && resource.data.uid == request.auth.uid;
+    }
+
+    match /communityGratitudes/{gratitudeId}/privateReactions/{uid} {
+      allow read: if isOwner(uid)
+        && isApprovedMember()
+        && exists(
+          /databases/$(database)/documents/communityGratitudes/$(gratitudeId)
+        );
+
+      allow create, update: if isOwner(uid)
+        && isApprovedMember()
+        && exists(
+          /databases/$(database)/documents/communityGratitudes/$(gratitudeId)
+        )
+        && get(
+          /databases/$(database)/documents/communityGratitudes/$(gratitudeId)
+        ).data.uid != request.auth.uid
+        && request.resource.data.keys().hasOnly([
+          'joy',
+          'thanks',
+          'grace',
+          'updatedAt'
+        ])
+        && request.resource.data.joy is bool
+        && request.resource.data.thanks is bool
+        && request.resource.data.grace is bool
+        && request.resource.data.updatedAt == request.time
+        && getAfter(
+          /databases/$(database)/documents/communityGratitudes/$(gratitudeId)
+        ).data.reactionJoyCount
+          == get(
+            /databases/$(database)/documents/communityGratitudes/$(gratitudeId)
+          ).data.get('reactionJoyCount', 0)
+            + (request.resource.data.joy == true ? 1 : 0)
+            - (hadJoyReaction(gratitudeId, uid) ? 1 : 0)
+        && getAfter(
+          /databases/$(database)/documents/communityGratitudes/$(gratitudeId)
+        ).data.reactionThanksCount
+          == get(
+            /databases/$(database)/documents/communityGratitudes/$(gratitudeId)
+          ).data.get('reactionThanksCount', 0)
+            + (request.resource.data.thanks == true ? 1 : 0)
+            - (hadThanksReaction(gratitudeId, uid) ? 1 : 0)
+        && getAfter(
+          /databases/$(database)/documents/communityGratitudes/$(gratitudeId)
+        ).data.reactionGraceCount
+          == get(
+            /databases/$(database)/documents/communityGratitudes/$(gratitudeId)
+          ).data.get('reactionGraceCount', 0)
+            + (request.resource.data.grace == true ? 1 : 0)
+            - (hadGraceReaction(gratitudeId, uid) ? 1 : 0);
+
+      allow delete: if false;
+    }
+
+    match /communityGratitudes/{gratitudeId}/comments/{commentId} {
+      allow read: if isApprovedMember()
+        && exists(
+          /databases/$(database)/documents/communityGratitudes/$(gratitudeId)
+        );
+
+      allow create: if isApprovedMember()
+        && exists(
+          /databases/$(database)/documents/communityGratitudes/$(gratitudeId)
+        )
         && request.resource.data.keys().hasOnly([
           'uid',
           'authorDisplay',
           'content',
-          'createdAt',
-          'updatedAt'
+          'createdAt'
         ])
-        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.uid == request.auth.uid
         && request.resource.data.authorDisplay
-          == resource.data.authorDisplay
-        && request.resource.data.createdAt == resource.data.createdAt
+          == get(
+            /databases/$(database)/documents/users/$(request.auth.uid)
+          ).data.name
         && request.resource.data.content is string
         && request.resource.data.content.size() >= 1
-        && request.resource.data.content.size() <= 2000
-        && request.resource.data.updatedAt == request.time;
+        && request.resource.data.content.size() <= 500
+        && request.resource.data.createdAt == request.time;
+
+      allow update: if false;
 
       allow delete: if isApprovedMember()
-        && resource.data.uid == request.auth.uid;
+        && (
+          resource.data.uid == request.auth.uid
+          || (
+            get(
+              /databases/$(database)/documents/communityGratitudes/$(gratitudeId)
+            ).data.uid == request.auth.uid
+            && !existsAfter(
+              /databases/$(database)/documents/communityGratitudes/$(gratitudeId)
+            )
+          )
+        );
     }
 
     match /communityPrayers/{prayerId} {
