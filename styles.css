@@ -502,7 +502,29 @@
     }
 
     .prayer-delete-button {
-      color: #91483F;
+      width: auto !important;
+      min-width: 0 !important;
+      min-height: 36px !important;
+      height: 36px !important;
+      padding: 6px 8px !important;
+      flex: 0 0 auto !important;
+      justify-self: end;
+      margin: 0 0 0 auto !important;
+      border: 0 !important;
+      border-radius: 8px !important;
+      background: transparent !important;
+      box-shadow: none !important;
+      color: #8C8580 !important;
+      font-size: 12px !important;
+      font-weight: 500 !important;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .prayer-delete-button:hover,
+    .prayer-delete-button:focus-visible {
+      background: #F7ECEA !important;
+      color: #91483F !important;
     }
 
     .prayer-empty {
@@ -603,9 +625,16 @@
       padding: 4px 6px;
       border: 0;
       background: transparent;
-      color: #91483F;
+      color: #8C8580;
       font-size: 12px;
       cursor: pointer;
+    }
+
+    .prayer-comment-delete:hover,
+    .prayer-comment-delete:focus-visible {
+      color: #91483F;
+      background: #F7ECEA;
+      border-radius: 6px;
     }
 
     .prayer-comment-empty {
@@ -1370,3 +1399,140 @@
     .word-room-comment-reactions { display: flex; flex-wrap: wrap; gap: 6px; }
     .word-room-reaction-button { min-height: 38px; margin: 0; padding: 7px 10px; font-size: 12px; }
     .word-room-reaction-button.active { border-color: #A68563; background: #F0E5D8; }
+
+    /* ========================================
+       교회소식 / 마이페이지
+    ======================================== */
+
+    .news-form,
+    .mypage-settings-form {
+      display: grid;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .news-form label,
+    .mypage-settings-form label {
+      color: #443C34;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .news-form input,
+    .news-form textarea,
+    .mypage-settings-form select {
+      width: 100%;
+      min-height: 50px;
+      padding: 12px 14px;
+      border: 1px solid #DDD3C7;
+      border-radius: 14px;
+      background: #FCFBF8;
+      color: #443C34;
+      font: inherit;
+    }
+
+    .news-form textarea {
+      min-height: 140px;
+      line-height: 1.6;
+      resize: vertical;
+    }
+
+    .news-pin-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 42px;
+    }
+
+    .news-pin-label input {
+      width: 20px;
+      min-height: 20px;
+      margin: 0;
+    }
+
+    .news-list {
+      display: grid;
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    .news-card {
+      padding: 18px;
+      border: 1px solid #E5DDD2;
+      border-radius: 16px;
+      background: #FCFBF8;
+    }
+
+    .news-card.pinned {
+      border-color: #D0B18C;
+      background: #FFF9F0;
+    }
+
+    .news-pin-badge {
+      display: inline-block;
+      margin-bottom: 8px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: #EFE1D0;
+      color: #745B42;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .news-card h3 { margin: 0 0 8px; color: #443C34; }
+    .news-card-content { margin: 10px 0 0 !important; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .news-event-date { margin: 0 !important; color: #7A624D !important; font-size: 13px; font-weight: 700; }
+    .news-card-meta { margin: 12px 0 0 !important; color: #81786D !important; font-size: 12px; }
+    .news-card-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+    .news-empty { margin: 0; padding: 20px; border-radius: 14px; background: #F8F5EF; text-align: center; color: #71685F; }
+
+    .mypage-profile-list { display: grid; gap: 0; margin: 16px 0 0; }
+    .mypage-profile-list div { display: grid; grid-template-columns: 90px 1fr; gap: 12px; padding: 12px 0; border-bottom: 1px solid #EEE7DD; }
+    .mypage-profile-list dt { color: #81786D; font-size: 13px; font-weight: 700; }
+    .mypage-profile-list dd { margin: 0; color: #443C34; font-weight: 700; overflow-wrap: anywhere; }
+    .mypage-days { margin: 12px 0 0 !important; color: #745B42 !important; font-size: 32px !important; font-weight: 800; }
+    .mypage-days-guide,
+    .mypage-notification-guide { color: #81786D !important; font-size: 13px; }
+
+    .word-room-leave-button {
+      width: auto;
+      min-height: 40px;
+      margin-top: 16px;
+      color: #91483F;
+    }
+
+    body[data-font-size="small"] p,
+    body[data-font-size="small"] button,
+    body[data-font-size="small"] input,
+    body[data-font-size="small"] textarea,
+    body[data-font-size="small"] select,
+    body[data-font-size="small"] label,
+    body[data-font-size="small"] dd { font-size: 14px !important; }
+
+    body[data-font-size="large"] p,
+    body[data-font-size="large"] button,
+    body[data-font-size="large"] input,
+    body[data-font-size="large"] textarea,
+    body[data-font-size="large"] select,
+    body[data-font-size="large"] label,
+    body[data-font-size="large"] dd { font-size: 18px !important; }
+
+    body[data-font-size="extra-large"] p,
+    body[data-font-size="extra-large"] button,
+    body[data-font-size="extra-large"] input,
+    body[data-font-size="extra-large"] textarea,
+    body[data-font-size="extra-large"] select,
+    body[data-font-size="extra-large"] label,
+    body[data-font-size="extra-large"] dd { font-size: 20px !important; }
+
+    body[data-font-size="small"] h1 { font-size: 19px !important; }
+    body[data-font-size="small"] h2 { font-size: 18px !important; }
+    body[data-font-size="small"] h3 { font-size: 16px !important; }
+    body[data-font-size="large"] h1 { font-size: 24px !important; }
+    body[data-font-size="large"] h2 { font-size: 22px !important; }
+    body[data-font-size="large"] h3 { font-size: 19px !important; }
+    body[data-font-size="extra-large"] h1 { font-size: 27px !important; }
+    body[data-font-size="extra-large"] h2 { font-size: 24px !important; }
+    body[data-font-size="extra-large"] h3 { font-size: 22px !important; }
+
+    body .prayer-delete-button { font-size: 12px !important; }
