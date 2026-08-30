@@ -54,6 +54,10 @@ let wordRoomPlanCache = new Map();
 let editingWordRoomPlanId = null;
 let wordRoomPlans = [];
 let showAllWordRoomPlans = false;
+let memoryPassage = null;
+let memoryChunks = [];
+let memoryAvailableChunks = [];
+let memorySelectedChunks = [];
 let newsCache = new Map();
 let editingNewsId = null;
 
@@ -791,17 +795,167 @@ function getMemoryCheckReference(dateKey) {
   );
 }
 
-function renderMemoryCheckState(isCompleted) {
+function getMemoryAssessmentLabel(value) {
+  return {
+    practicing: "아직 연습 중",
+    almost: "거의 외웠어요",
+    memorized: "외웠어요"
+  }[value] || "암송 완료";
+}
+
+function splitMemoryPassage(content) {
+  const words = content.replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
+  if (words.length < 2) return words;
+  const targetCount = Math.min(12, Math.max(4, Math.ceil(words.length / 6)));
+  const size = Math.ceil(words.length / targetCount);
+  const chunks = [];
+  for (let index = 0; index < words.length; index += size) {
+    chunks.push(words.slice(index, index + size).join(" "));
+  }
+  return chunks;
+}
+
+function shuffleMemoryChunks(chunks) {
+  const shuffled = chunks.map((text, index) => ({ id: index, text }));
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[index]];
+  }
+  if (shuffled.length > 1 && shuffled.every((chunk, index) => chunk.id === index)) {
+    [shuffled[0], shuffled[1]] = [shuffled[1], shuffled[0]];
+  }
+  return shuffled;
+}
+
+function renderMemoryPractice() {
+  const practice = document.getElementById("memory-practice");
+  const available = document.getElementById("memory-available-chunks");
+  const selected = document.getElementById("memory-selected-chunks");
+  practice.hidden = memoryChunks.length < 2;
+  available.replaceChildren();
+  selected.replaceChildren();
+
+  memorySelectedChunks.forEach((chunk) => {
+    const item = document.createElement("span");
+    item.className = "memory-selected-chunk";
+    item.textContent = chunk.text;
+    selected.append(item);
+  });
+  if (memorySelectedChunks.length === 0) {
+    const guide = document.createElement("span");
+    guide.className = "memory-chunk-guide";
+    guide.textContent = "아래 구절을 순서대로 눌러주세요.";
+    selected.append(guide);
+  }
+
+  memoryAvailableChunks.forEach((chunk) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "memory-chunk-button";
+    button.textContent = chunk.text;
+    button.addEventListener("click", () => {
+      memorySelectedChunks.push(chunk);
+      memoryAvailableChunks = memoryAvailableChunks.filter((item) => item.id !== chunk.id);
+      document.getElementById("memory-practice-result").textContent = "";
+      renderMemoryPractice();
+    });
+    available.append(button);
+  });
+}
+
+function resetMemoryPractice() {
+  memorySelectedChunks = [];
+  memoryAvailableChunks = shuffleMemoryChunks(memoryChunks);
+  document.getElementById("memory-practice-result").textContent = "";
+  document.getElementById("memory-assessment").hidden = true;
+  renderMemoryPractice();
+}
+
+function undoMemoryChunk() {
+  const chunk = memorySelectedChunks.pop();
+  if (!chunk) return;
+  memoryAvailableChunks.push(chunk);
+  document.getElementById("memory-practice-result").textContent = "";
+  renderMemoryPractice();
+}
+
+function checkMemoryPractice() {
+  const result = document.getElementById("memory-practice-result");
+  if (memorySelectedChunks.length !== memoryChunks.length) {
+    result.textContent = "남은 구절도 모두 눌러주세요.";
+    return;
+  }
+  const isCorrect = memorySelectedChunks.every((chunk, index) => chunk.id === index);
+  result.textContent = isCorrect
+    ? "순서를 모두 맞췄어요! 이제 오늘의 상태를 선택해주세요."
+    : "순서가 다른 부분이 있어요. 다시 한번 살펴보세요.";
+  result.dataset.correct = String(isCorrect);
+  document.getElementById("memory-assessment").hidden = !isCorrect;
+}
+
+function showMemoryAnswer() {
+  const result = document.getElementById("memory-practice-result");
+  result.textContent = memoryChunks.map((chunk) => chunk.text).join(" ");
+  result.dataset.correct = "answer";
+  document.getElementById("memory-assessment").hidden = false;
+}
+
+async function loadMemoryPassage() {
+  const snapshot = await getDoc(doc(db, "memoryPassages", "current"));
+  memoryPassage = snapshot.exists() ? snapshot.data() : null;
+  const reference = memoryPassage?.reference || "요한일서 4장 15절~21절";
+  const content = memoryPassage?.content || "";
+  document.querySelector(".memory-passage").textContent = reference;
+  document.getElementById("memory-passage-text").textContent = content
+    ? "말씀을 먼저 소리 내어 읽은 뒤 아래에서 순서를 확인해보세요."
+    : "관리자가 말씀 본문을 등록하면 순서 맞추기 연습이 열립니다.";
+  const admin = document.getElementById("memory-passage-admin");
+  admin.hidden = currentUserProfile?.role !== "admin";
+  if (!admin.hidden) {
+    document.getElementById("memory-passage-reference").value = reference;
+    document.getElementById("memory-passage-content").value = content;
+  }
+  memoryChunks = splitMemoryPassage(content);
+  resetMemoryPractice();
+}
+
+async function saveMemoryPassage() {
+  if (currentUserProfile?.role !== "admin") return;
+  const reference = document.getElementById("memory-passage-reference").value.trim();
+  const content = document.getElementById("memory-passage-content").value.trim();
+  if (!reference || reference.length > 100 || !content || content.length > 3000) {
+    setMessage("memory-check-message", "말씀 위치와 본문을 확인해주세요.", "error");
+    return;
+  }
+  setBusy("memory-passage-save-button", true, "저장 중...", "암송 말씀 저장");
+  try {
+    await setDoc(doc(db, "memoryPassages", "current"), {
+      reference,
+      content,
+      updatedBy: auth.currentUser.uid,
+      updatedAt: serverTimestamp()
+    });
+    await loadMemoryPassage();
+    setMessage("memory-check-message", "암송 말씀을 저장했습니다.", "success");
+  } catch {
+    setMessage("memory-check-message", "암송 말씀을 저장하지 못했습니다.", "error");
+  } finally {
+    setBusy("memory-passage-save-button", false, "저장 중...", "암송 말씀 저장");
+  }
+}
+
+function renderMemoryCheckState(record) {
   const status = document.getElementById("memory-check-status");
   const button = document.getElementById("memory-check-toggle-button");
+  const isCompleted = Boolean(record);
 
   status.textContent = isCompleted
-    ? "오늘 암송 완료를 기록했습니다."
-    : "오늘의 암송 기록이 아직 없습니다.";
+    ? "오늘 기록: " + getMemoryAssessmentLabel(record.assessment)
+    : "오늘의 암송 연습 기록이 아직 없습니다.";
   status.dataset.completed = String(isCompleted);
 
   button.dataset.completed = String(isCompleted);
-  button.textContent = isCompleted ? "오늘 기록 삭제" : "오늘 암송 완료";
+  button.textContent = isCompleted ? "오늘 기록 삭제" : "외웠어요로 기록";
   button.className = isCompleted
     ? "secondary-button"
     : "primary-button";
@@ -812,7 +966,6 @@ function renderMemoryCheckHistory(documents) {
   list.replaceChildren();
 
   const records = documents
-    .filter((record) => record.data().completed === true)
     .sort((first, second) => second.id.localeCompare(first.id));
 
   if (records.length === 0) {
@@ -832,7 +985,7 @@ function renderMemoryCheckHistory(documents) {
 
     const state = document.createElement("span");
     state.className = "memory-check-history-state";
-    state.textContent = "암송 완료";
+    state.textContent = getMemoryAssessmentLabel(record.data().assessment);
 
     row.append(date, state);
     list.append(row);
@@ -848,10 +1001,7 @@ async function loadMemoryChecks() {
     )
   ]);
 
-  renderMemoryCheckState(
-    todaySnapshot.exists() &&
-    todaySnapshot.data().completed === true
-  );
+  renderMemoryCheckState(todaySnapshot.exists() ? todaySnapshot.data() : null);
   renderMemoryCheckHistory(historySnapshot.docs);
 }
 
@@ -865,7 +1015,7 @@ async function openMemoryCheck() {
   setMessage("memory-check-message", "암송 기록을 불러오는 중입니다.");
 
   try {
-    await loadMemoryChecks();
+    await Promise.all([loadMemoryChecks(), loadMemoryPassage()]);
     setMessage("memory-check-message", "");
   } catch {
     setMessage(
@@ -902,12 +1052,8 @@ async function toggleMemoryCheck() {
     if (isCompleted) {
       await deleteDoc(reference);
     } else {
-      await setDoc(reference, {
-        uid: auth.currentUser.uid,
-        date: today,
-        completed: true,
-        createdAt: serverTimestamp()
-      });
+      await saveMemoryAssessment("memorized", { quiet: true });
+      return;
     }
 
     await loadMemoryChecks();
@@ -926,6 +1072,29 @@ async function toggleMemoryCheck() {
     );
   } finally {
     button.disabled = false;
+  }
+}
+
+async function saveMemoryAssessment(assessment, options = {}) {
+  if (!auth.currentUser || !["practicing", "almost", "memorized"].includes(assessment)) return;
+  try {
+    const today = getTodayDateKey();
+    const reference = getMemoryCheckReference(today);
+    const existing = await getDoc(reference);
+    await setDoc(reference, {
+      uid: auth.currentUser.uid,
+      date: today,
+      completed: assessment === "memorized",
+      assessment,
+      createdAt: existing.exists() ? existing.data().createdAt : serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+    await loadMemoryChecks();
+    if (!options.quiet) {
+      setMessage("memory-check-message", "오늘 상태를 ‘" + getMemoryAssessmentLabel(assessment) + "’로 기록했습니다.", "success");
+    }
+  } catch {
+    setMessage("memory-check-message", "암송 기록을 저장하지 못했습니다.", "error");
   }
 }
 
@@ -2856,10 +3025,20 @@ function resetWordRoomForm() {
   editingWordRoomId = null;
   document.getElementById("word-room-name").value = "";
   document.getElementById("word-room-description").value = "";
+  document.getElementById("word-room-type").value = "word";
+  document.getElementById("word-room-type").disabled = false;
   document.getElementById("word-room-save-button").textContent =
-    "말씀방 만들기";
+    "모임방 만들기";
   document.getElementById("word-room-cancel-button").hidden = true;
   setMessage("word-room-message", "");
+}
+
+function getWordRoomType(room) {
+  return room?.type === "prayer" ? "prayer" : "word";
+}
+
+function getWordRoomTypeLabel(room) {
+  return getWordRoomType(room) === "prayer" ? "기도모임" : "말씀모임";
 }
 
 function canManageWordRoom(room) {
@@ -2898,7 +3077,7 @@ function renderWordRooms(documents) {
   if (rooms.length === 0) {
     const empty = document.createElement("p");
     empty.className = "word-room-empty";
-    empty.textContent = "아직 참여 중인 말씀방이 없습니다.";
+    empty.textContent = "아직 참여 중인 모임방이 없습니다.";
     list.append(empty);
     return;
   }
@@ -2911,7 +3090,11 @@ function renderWordRooms(documents) {
 
     const name = document.createElement("h3");
     name.textContent = room.name;
-    card.append(name);
+    const badge = document.createElement("span");
+    badge.className = "word-room-type-badge";
+    badge.dataset.type = getWordRoomType(room);
+    badge.textContent = getWordRoomTypeLabel(room);
+    card.append(badge, name);
 
     const description = document.createElement("p");
     description.className = "word-room-description";
@@ -2966,12 +3149,13 @@ async function loadWordRooms() {
 }
 
 async function saveWordRoom() {
+  const type = document.getElementById("word-room-type").value;
   const name = document.getElementById("word-room-name").value.trim();
   const description = document
     .getElementById("word-room-description")
     .value.trim();
 
-  if (!name || name.length > 60 || description.length > 500) {
+  if (!["word", "prayer"].includes(type) || !name || name.length > 60 || description.length > 500) {
     setMessage(
       "word-room-message",
       "방 이름은 1~60자, 설명은 500자 이내로 입력해주세요.",
@@ -2985,7 +3169,7 @@ async function saveWordRoom() {
     "word-room-save-button",
     true,
     "저장 중...",
-    wasEditing ? "방 정보 수정" : "말씀방 만들기"
+    wasEditing ? "방 정보 수정" : "모임방 만들기"
   );
 
   try {
@@ -3012,6 +3196,7 @@ async function saveWordRoom() {
       const batch = writeBatch(db);
 
       batch.set(roomReference, {
+        type,
         name,
         description,
         createdBy: auth.currentUser.uid,
@@ -3034,13 +3219,13 @@ async function saveWordRoom() {
     await loadWordRooms();
     setMessage(
       "word-room-message",
-      wasEditing ? "말씀방 정보를 수정했습니다." : "말씀방을 만들었습니다.",
+      wasEditing ? "모임방 정보를 수정했습니다." : "모임방을 만들었습니다.",
       "success"
     );
   } catch {
     setMessage(
       "word-room-message",
-      "말씀방을 저장하지 못했습니다. 다시 시도해주세요.",
+      "모임방을 저장하지 못했습니다. 다시 시도해주세요.",
       "error"
     );
   } finally {
@@ -3048,7 +3233,7 @@ async function saveWordRoom() {
     button.disabled = false;
     button.textContent = editingWordRoomId
       ? "방 정보 수정"
-      : "말씀방 만들기";
+      : "모임방 만들기";
   }
 }
 
@@ -3062,6 +3247,8 @@ function editWordRoom(roomId) {
   document.getElementById("word-room-name").value = room.name;
   document.getElementById("word-room-description").value =
     room.description || "";
+  document.getElementById("word-room-type").value = getWordRoomType(room);
+  document.getElementById("word-room-type").disabled = true;
   document.getElementById("word-room-save-button").textContent =
     "방 정보 수정";
   document.getElementById("word-room-cancel-button").hidden = false;
@@ -3075,7 +3262,7 @@ async function deleteWordRoom(roomId) {
   if (
     !room ||
     !canManageWordRoom(room) ||
-    !window.confirm("이 말씀방을 삭제하시겠습니까?")
+    !window.confirm("이 모임방을 삭제하시겠습니까?")
   ) {
     return;
   }
@@ -3109,11 +3296,11 @@ async function deleteWordRoom(roomId) {
       resetWordRoomForm();
     }
     await loadWordRooms();
-    setMessage("word-room-message", "말씀방을 삭제했습니다.", "success");
+    setMessage("word-room-message", "모임방을 삭제했습니다.", "success");
   } catch {
     setMessage(
       "word-room-message",
-      "말씀방을 삭제하지 못했습니다.",
+      "모임방을 삭제하지 못했습니다.",
       "error"
     );
   }
@@ -3153,7 +3340,8 @@ async function refreshCurrentWordRoom() {
   const room = { id: roomSnapshot.id, ...roomSnapshot.data() };
   wordRoomCache.set(room.id, room);
   document.getElementById("word-room-detail-meta").textContent =
-    "방장 " + room.leaderName + " · " + formatWordRoomMemberCount(room);
+    getWordRoomTypeLabel(room) + " · 방장 " + room.leaderName + " · " + formatWordRoomMemberCount(room);
+  applyWordRoomTypeCopy(room);
   document.getElementById("word-room-leave-button").hidden =
     room.leaderUid === auth.currentUser.uid;
   const memberSnapshot = await getDocs(collection(db, "wordRooms", room.id, "members"));
@@ -3206,7 +3394,7 @@ async function inviteWordRoomMember() {
 async function removeWordRoomMember(uid) {
   const room = wordRoomCache.get(currentWordRoomId);
   const member = currentWordRoomMembers.get(uid);
-  if (!room || !member || room.leaderUid !== auth.currentUser.uid || !window.confirm(member.name + "님을 말씀방에서 퇴장시키겠습니까?")) return;
+  if (!room || !member || room.leaderUid !== auth.currentUser.uid || !window.confirm(member.name + "님을 모임방에서 퇴장시키겠습니까?")) return;
   const batch = writeBatch(db);
   batch.update(doc(db, "wordRooms", room.id), { memberUids: room.memberUids.filter((item) => item !== uid), updatedAt: serverTimestamp() });
   batch.delete(doc(db, "wordRooms", room.id, "members", uid));
@@ -3237,7 +3425,7 @@ async function transferWordRoomLeadership(uid) {
 async function leaveWordRoom() {
   const room = wordRoomCache.get(currentWordRoomId);
   if (!room || room.leaderUid === auth.currentUser.uid ||
-      !window.confirm("이 말씀방에서 나가시겠습니까?")) return;
+      !window.confirm("이 모임방에서 나가시겠습니까?")) return;
 
   const batch = writeBatch(db);
   batch.update(doc(db, "wordRooms", room.id), {
@@ -3250,20 +3438,36 @@ async function leaveWordRoom() {
     await batch.commit();
     currentWordRoomId = null;
     await openWordRooms();
-    setMessage("word-room-message", "말씀방에서 나왔습니다.", "success");
+    setMessage("word-room-message", "모임방에서 나왔습니다.", "success");
   } catch {
-    setMessage("word-room-detail-message", "말씀방에서 나가지 못했습니다.", "error");
+    setMessage("word-room-detail-message", "모임방에서 나가지 못했습니다.", "error");
   }
 }
 
 function resetWordRoomPlanForm() {
   editingWordRoomPlanId = null;
+  const room = wordRoomCache.get(currentWordRoomId);
+  const isPrayer = getWordRoomType(room) === "prayer";
   document.getElementById("word-room-plan-date").value = "";
   document.getElementById("word-room-plan-passage").value = "";
   document.getElementById("word-room-plan-note").value = "";
-  document.getElementById("word-room-plan-save-button").textContent = "말씀 계획 추가";
+  document.getElementById("word-room-plan-save-button").textContent = isPrayer ? "기도 계획 추가" : "말씀 계획 추가";
   document.getElementById("word-room-plan-cancel-button").hidden = true;
   setMessage("word-room-plan-message", "");
+}
+
+function applyWordRoomTypeCopy(room) {
+  const isPrayer = getWordRoomType(room) === "prayer";
+  document.getElementById("word-room-detail-heading").textContent = getWordRoomTypeLabel(room) + " 안내";
+  document.getElementById("word-room-plan-form-heading").textContent = isPrayer ? "기도 계획 설정" : "말씀 계획 설정";
+  document.getElementById("word-room-plan-form-description").textContent = isPrayer
+    ? "날짜별 기도 제목이나 모임 내용을 정해주세요."
+    : "날짜별로 함께 읽을 말씀을 정해주세요.";
+  document.getElementById("word-room-plan-date-label").textContent = isPrayer ? "기도 날짜" : "읽는 날짜";
+  document.getElementById("word-room-plan-passage-label").textContent = isPrayer ? "기도 제목 또는 모임 내용" : "읽을 말씀";
+  const passageInput = document.getElementById("word-room-plan-passage");
+  passageInput.placeholder = isPrayer ? "예: 환우와 교회를 위한 기도" : "예: 요한복음 1장";
+  document.getElementById("word-room-plan-list-heading").textContent = isPrayer ? "날짜별 기도 계획" : "날짜별 말씀 계획";
 }
 
 function localDateKey(date) {
@@ -3293,9 +3497,10 @@ function renderWordRoomPlans(plans, room) {
   if (visiblePlans.length === 0) {
     const empty = document.createElement("p");
     empty.className = "word-room-empty";
+    const typeLabel = getWordRoomType(room) === "prayer" ? "기도" : "말씀";
     empty.textContent = plans.length === 0
-      ? "등록된 말씀 계획이 없습니다."
-      : "오늘 등록된 말씀 계획이 없습니다.";
+      ? "등록된 " + typeLabel + " 계획이 없습니다."
+      : "오늘 등록된 " + typeLabel + " 계획이 없습니다.";
     list.append(empty);
     return;
   }
@@ -3370,11 +3575,11 @@ async function saveWordRoomPlanComment(room, plan, textarea, container) {
     });
     textarea.value = "";
     await renderWordRoomPlanComments(room, plan, container);
-  } catch { setMessage("word-room-detail-message", "말씀 나눔을 저장하지 못했습니다.", "error"); }
+  } catch { setMessage("word-room-detail-message", "나눔을 저장하지 못했습니다.", "error"); }
 }
 
 async function deleteWordRoomPlanComment(room, plan, comment, container) {
-  if (comment.uid !== auth.currentUser.uid || !window.confirm("이 말씀 나눔을 삭제하시겠습니까?")) return;
+  if (comment.uid !== auth.currentUser.uid || !window.confirm("이 나눔을 삭제하시겠습니까?")) return;
   try {
     const batch = writeBatch(db);
     batch.delete(doc(db, "wordRooms", room.id, "plans", plan.id, "comments", comment.id));
@@ -3416,8 +3621,10 @@ async function renderWordRoomPlanComments(room, plan, container) {
   const textarea = document.createElement("textarea");
   textarea.maxLength = 1000;
   textarea.rows = 3;
-  textarea.placeholder = "은혜받은 말씀 한 구절과 나눔을 남겨주세요";
-  const button = createPrayerActionButton("말씀 나눔 남기기", "primary-button", () => saveWordRoomPlanComment(room, plan, textarea, container));
+  textarea.placeholder = getWordRoomType(room) === "prayer"
+    ? "함께 나눌 기도 제목이나 기도 내용을 남겨주세요"
+    : "은혜받은 말씀 한 구절과 나눔을 남겨주세요";
+  const button = createPrayerActionButton(getWordRoomType(room) === "prayer" ? "기도 나눔 남기기" : "말씀 나눔 남기기", "primary-button", () => saveWordRoomPlanComment(room, plan, textarea, container));
   container.append(textarea, button);
 }
 
@@ -3451,7 +3658,7 @@ async function saveWordRoomPlan() {
   const note = document.getElementById("word-room-plan-note").value.trim();
   if (!room || room.leaderUid !== auth.currentUser.uid || !date ||
       !passage || passage.length > 120 || note.length > 500) {
-    setMessage("word-room-plan-message", "날짜와 읽을 말씀을 확인해주세요.", "error");
+    setMessage("word-room-plan-message", getWordRoomType(room) === "prayer" ? "날짜와 기도 내용을 확인해주세요." : "날짜와 읽을 말씀을 확인해주세요.", "error");
     return;
   }
 
@@ -3470,9 +3677,10 @@ async function saveWordRoomPlan() {
     resetWordRoomPlanForm();
     showAllWordRoomPlans = true;
     await loadWordRoomPlans(room);
-    setMessage("word-room-plan-message", wasEditing ? "말씀 계획을 수정했습니다." : "말씀 계획을 추가했습니다.", "success");
+    const planLabel = getWordRoomType(room) === "prayer" ? "기도 계획" : "말씀 계획";
+    setMessage("word-room-plan-message", wasEditing ? planLabel + "을 수정했습니다." : planLabel + "을 추가했습니다.", "success");
   } catch {
-    setMessage("word-room-plan-message", "말씀 계획을 저장하지 못했습니다.", "error");
+    setMessage("word-room-plan-message", "계획을 저장하지 못했습니다.", "error");
   }
 }
 
@@ -3484,7 +3692,7 @@ function editWordRoomPlan(planId) {
   document.getElementById("word-room-plan-date").value = plan.date;
   document.getElementById("word-room-plan-passage").value = plan.passage;
   document.getElementById("word-room-plan-note").value = plan.note || "";
-  document.getElementById("word-room-plan-save-button").textContent = "말씀 계획 수정";
+  document.getElementById("word-room-plan-save-button").textContent = getWordRoomType(room) === "prayer" ? "기도 계획 수정" : "말씀 계획 수정";
   document.getElementById("word-room-plan-cancel-button").hidden = false;
 }
 
@@ -3492,7 +3700,7 @@ async function deleteWordRoomPlan(planId) {
   const plan = wordRoomPlanCache.get(planId);
   const room = wordRoomCache.get(currentWordRoomId);
   if (!plan || !room || room.leaderUid !== auth.currentUser.uid ||
-      !window.confirm("이 말씀 계획을 삭제하시겠습니까?")) return;
+      !window.confirm("이 계획을 삭제하시겠습니까?")) return;
   try {
     const comments = await getDocs(collection(db, "wordRooms", room.id, "plans", planId, "comments"));
     const batch = writeBatch(db);
@@ -3500,7 +3708,7 @@ async function deleteWordRoomPlan(planId) {
     batch.delete(doc(db, "wordRooms", room.id, "plans", planId));
     await batch.commit();
     await loadWordRoomPlans(room);
-    setMessage("word-room-plan-message", "말씀 계획을 삭제했습니다.", "success");
+    setMessage("word-room-plan-message", "계획을 삭제했습니다.", "success");
   } catch {
     setMessage("word-room-plan-message", "말씀 계획을 삭제하지 못했습니다.", "error");
   }
@@ -3519,8 +3727,9 @@ async function openWordRoom(roomId) {
   document.getElementById("word-room-detail-description").textContent =
     room.description || "방 설명이 없습니다.";
   document.getElementById("word-room-detail-meta").textContent =
-    "방장 " + room.leaderName + " · " +
+    getWordRoomTypeLabel(room) + " · 방장 " + room.leaderName + " · " +
     formatWordRoomMemberCount(room);
+  applyWordRoomTypeCopy(room);
   showScreen("word-room-detail-screen");
   setMessage("word-room-detail-message", "참여자 목록을 불러오는 중입니다.");
   try {
@@ -3539,7 +3748,7 @@ async function openWordRooms() {
 
   showScreen("rooms-screen");
   resetWordRoomForm();
-  setMessage("word-room-message", "말씀방을 불러오는 중입니다.");
+  setMessage("word-room-message", "모임방을 불러오는 중입니다.");
 
   try {
     await loadWordRooms();
@@ -3547,7 +3756,7 @@ async function openWordRooms() {
   } catch {
     setMessage(
       "word-room-message",
-      "말씀방을 불러오지 못했습니다. 다시 시도해주세요.",
+      "모임방을 불러오지 못했습니다. 다시 시도해주세요.",
       "error"
     );
   }
@@ -4165,6 +4374,12 @@ window.openBibleCheck = openBibleCheck;
 window.toggleBibleCheck = toggleBibleCheck;
 window.openMemoryCheck = openMemoryCheck;
 window.toggleMemoryCheck = toggleMemoryCheck;
+window.saveMemoryPassage = saveMemoryPassage;
+window.resetMemoryPractice = resetMemoryPractice;
+window.undoMemoryChunk = undoMemoryChunk;
+window.checkMemoryPractice = checkMemoryPractice;
+window.showMemoryAnswer = showMemoryAnswer;
+window.saveMemoryAssessment = saveMemoryAssessment;
 window.openPrayer = openPrayer;
 window.openWordNotes = openWordNotes;
 window.openGratitude = openGratitude;

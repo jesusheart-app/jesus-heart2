@@ -278,15 +278,47 @@ service cloud.firestore {
           'uid',
           'date',
           'completed',
-          'createdAt'
+          'assessment',
+          'createdAt',
+          'updatedAt'
         ])
         && request.resource.data.uid == uid
         && request.resource.data.date == dateKey
-        && request.resource.data.completed == true
-        && request.resource.data.createdAt == request.time;
+        && request.resource.data.completed
+          == (request.resource.data.assessment == 'memorized')
+        && request.resource.data.assessment in ['practicing', 'almost', 'memorized']
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
 
-      allow update: if false;
+      allow update: if isOwner(uid)
+        && request.resource.data.keys().hasOnly([
+          'uid', 'date', 'completed', 'assessment', 'createdAt', 'updatedAt'
+        ])
+        && request.resource.data.uid == uid
+        && request.resource.data.date == dateKey
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.assessment in ['practicing', 'almost', 'memorized']
+        && request.resource.data.completed
+          == (request.resource.data.assessment == 'memorized')
+        && request.resource.data.updatedAt == request.time;
       allow delete: if isOwner(uid);
+    }
+
+    match /memoryPassages/current {
+      allow read: if isApprovedMember();
+      allow create, update: if isApprovedAdmin()
+        && request.resource.data.keys().hasOnly([
+          'reference', 'content', 'updatedBy', 'updatedAt'
+        ])
+        && request.resource.data.reference is string
+        && request.resource.data.reference.size() >= 1
+        && request.resource.data.reference.size() <= 100
+        && request.resource.data.content is string
+        && request.resource.data.content.size() >= 1
+        && request.resource.data.content.size() <= 3000
+        && request.resource.data.updatedBy == request.auth.uid
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if false;
     }
 
     match /communityBibleChecks/{dateKey}/participants/{uid} {
@@ -839,6 +871,7 @@ service cloud.firestore {
 
       allow create: if isApprovedMember()
         && request.resource.data.keys().hasOnly([
+          'type',
           'name',
           'description',
           'createdBy',
@@ -848,6 +881,7 @@ service cloud.firestore {
           'createdAt',
           'updatedAt'
         ])
+        && request.resource.data.type in ['word', 'prayer']
         && request.resource.data.name is string
         && request.resource.data.name.size() >= 1
         && request.resource.data.name.size() <= 60
@@ -882,6 +916,7 @@ service cloud.firestore {
           )
         )
         && request.resource.data.keys().hasOnly([
+          'type',
           'name',
           'description',
           'createdBy',
@@ -891,6 +926,8 @@ service cloud.firestore {
           'createdAt',
           'updatedAt'
         ])
+        && request.resource.data.get('type', 'word')
+          == resource.data.get('type', 'word')
         && request.resource.data.createdBy == resource.data.createdBy
         && request.resource.data.createdAt == resource.data.createdAt
         && request.resource.data.name is string
