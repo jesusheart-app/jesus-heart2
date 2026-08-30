@@ -676,6 +676,78 @@
       font-weight: 700;
     }
 
+    .memory-passage-text {
+      margin-top: 8px;
+      color: #71685F;
+      line-height: 1.65;
+    }
+
+    .memory-passage-admin {
+      display: grid;
+      gap: 9px;
+      margin-top: 20px;
+      padding-top: 18px;
+      border-top: 1px solid #E1D9CE;
+    }
+
+    .memory-passage-admin[hidden] { display: none; }
+    .memory-passage-admin label { color: #443C34; font-weight: 700; }
+    .memory-passage-admin input,
+    .memory-passage-admin textarea {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid #DDD3C7;
+      border-radius: 14px;
+      background: #FCFBF8;
+      color: #443C34;
+      font: inherit;
+    }
+
+    .memory-practice { display: grid; gap: 12px; margin-top: 18px; }
+    .memory-practice[hidden], .memory-assessment[hidden] { display: none; }
+    .memory-practice-label { margin: 4px 0 0 !important; color: #443C34 !important; font-weight: 700; }
+    .memory-chunk-area {
+      min-height: 64px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      padding: 12px;
+      border: 1px solid #DDD3C7;
+      border-radius: 14px;
+      background: #FCFBF8;
+    }
+    .memory-selected-chunks { align-items: stretch; background: #F5F9F3; }
+    .memory-chunk-button,
+    .memory-selected-chunk {
+      min-height: 44px;
+      padding: 10px 12px;
+      border: 1px solid #BFD0BC;
+      border-radius: 12px;
+      background: white;
+      color: #3F5845;
+      font: inherit;
+      line-height: 1.45;
+    }
+    .memory-selected-chunk { display: inline-flex; align-items: center; background: #EAF2E7; }
+    .memory-chunk-guide { color: #81786D; }
+    .memory-practice-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .memory-practice-actions .primary-button { grid-column: 1 / -1; }
+    .memory-practice-actions button { margin: 0; min-height: 46px; }
+    .memory-practice-result {
+      padding: 12px;
+      border-radius: 12px;
+      background: #F8F5EF;
+      color: #51483F;
+      line-height: 1.65;
+      white-space: pre-wrap;
+    }
+    .memory-practice-result:empty { display: none; }
+    .memory-practice-result[data-correct="true"] { background: #EAF2E7; color: #3F5845; font-weight: 700; }
+    .memory-assessment { display: grid; gap: 8px; padding-top: 8px; }
+    .memory-assessment p { margin: 0 !important; font-weight: 700; }
+    .memory-assessment button { min-height: 48px; padding: 10px; border: 1px solid #CFC3B4; border-radius: 12px; background: white; color: #443C34; font: inherit; font-weight: 700; }
+
     .memory-check-status {
       min-height: 28px;
       margin: 18px 0 !important;
@@ -1294,7 +1366,8 @@
     }
 
     .word-room-form input,
-    .word-room-form textarea {
+    .word-room-form textarea,
+    .word-room-form select {
       width: 100%;
       padding: 13px 14px;
       border: 1px solid #DDD3C7;
@@ -1303,6 +1376,21 @@
       color: #443C34;
       font: inherit;
     }
+
+    .word-room-form select { min-height: 52px; }
+
+    .word-room-type-badge {
+      display: inline-flex;
+      margin-bottom: 8px;
+      padding: 5px 9px;
+      border-radius: 999px;
+      background: #EAF2E7;
+      color: #4E6B54;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .word-room-type-badge[data-type="prayer"] { background: #F2EAF4; color: #705676; }
 
     .word-room-form input {
       min-height: 52px;

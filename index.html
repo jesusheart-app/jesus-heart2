@@ -373,7 +373,7 @@
             onclick="openWordRooms()"
           >
             <span class="menu-icon">🤝</span>
-            <span class="menu-name">말씀방</span>
+            <span class="menu-name">모임방</span>
           </button>
 
         </div>
@@ -417,7 +417,7 @@
             onclick="openWordRooms()"
           >
             <span class="nav-icon">🤝</span>
-            말씀방
+            모임방
           </button>
 
 
@@ -1139,22 +1139,53 @@
 
         <div class="page-card memory-passage-card">
 
-          <h2>2026년 암송 말씀</h2>
+          <h2 id="memory-passage-heading">2026년 암송 말씀</h2>
 
           <p class="memory-passage">
             요한일서 4장 15절~21절
           </p>
+
+          <div id="memory-passage-text" class="memory-passage-text"></div>
+
+          <div id="memory-passage-admin" class="memory-passage-admin" hidden>
+            <p>관리자는 모든 회원이 연습할 암송 말씀을 설정할 수 있습니다.</p>
+            <label for="memory-passage-reference">말씀 위치</label>
+            <input id="memory-passage-reference" type="text" maxlength="100" placeholder="예: 요한일서 4장 15절~21절">
+            <label for="memory-passage-content">말씀 본문</label>
+            <textarea id="memory-passage-content" maxlength="3000" rows="8" placeholder="암송할 말씀 본문을 붙여넣어 주세요"></textarea>
+            <button id="memory-passage-save-button" class="secondary-button" type="button" onclick="saveMemoryPassage()">암송 말씀 저장</button>
+          </div>
 
         </div>
 
 
         <div class="page-card">
 
-          <h2>오늘도 암송을 하셨나요?</h2>
+          <h2>암송 말씀 스스로 확인하기</h2>
 
           <p>
-            성경을 보며 암송한 후 오늘의 완료를 기록해주세요.
+            섞여 있는 구절을 원래 순서대로 눌러보세요. 키보드를 사용하지 않아도 됩니다.
           </p>
+
+          <div id="memory-practice" class="memory-practice" hidden>
+            <p class="memory-practice-label">내가 맞춘 순서</p>
+            <div id="memory-selected-chunks" class="memory-chunk-area memory-selected-chunks"></div>
+            <p class="memory-practice-label">눌러서 이어 붙이기</p>
+            <div id="memory-available-chunks" class="memory-chunk-area"></div>
+            <div class="memory-practice-actions">
+              <button class="secondary-button" type="button" onclick="undoMemoryChunk()">하나 되돌리기</button>
+              <button class="secondary-button" type="button" onclick="resetMemoryPractice()">다시 섞기</button>
+              <button class="primary-button" type="button" onclick="checkMemoryPractice()">순서 확인</button>
+            </div>
+            <button id="memory-answer-button" class="text-button" type="button" onclick="showMemoryAnswer()">정답 전체 보기</button>
+            <div id="memory-practice-result" class="memory-practice-result" aria-live="polite"></div>
+            <div id="memory-assessment" class="memory-assessment" hidden>
+              <p>오늘의 상태를 스스로 선택해주세요.</p>
+              <button type="button" onclick="saveMemoryAssessment('practicing')">아직 연습 중</button>
+              <button type="button" onclick="saveMemoryAssessment('almost')">거의 외웠어요</button>
+              <button type="button" onclick="saveMemoryAssessment('memorized')">외웠어요</button>
+            </div>
+          </div>
 
           <p
             id="memory-check-status"
@@ -1169,7 +1200,7 @@
             data-completed="false"
             onclick="toggleMemoryCheck()"
           >
-            오늘 암송 완료
+            외웠어요로 기록
           </button>
 
           <div
@@ -1198,14 +1229,14 @@
 
 
     <!-- ======================================
-         말씀방
+         모임방
     ======================================= -->
 
     <section id="rooms-screen" class="screen">
 
       <header class="app-header">
 
-        <h1 class="header-title">말씀방</h1>
+        <h1 class="header-title">모임방</h1>
 
         <button
           class="header-button"
@@ -1222,13 +1253,19 @@
 
         <div class="page-card">
 
-          <h2>새 말씀방 만들기</h2>
+          <h2>새 모임방 만들기</h2>
 
           <p>
-            말씀을 중심으로 함께 걸어갈 소그룹 공간을 만들어보세요.
+            말씀을 읽거나 함께 기도할 소그룹 공간을 만들어보세요.
           </p>
 
           <div class="word-room-form">
+
+            <label for="word-room-type">모임 종류</label>
+            <select id="word-room-type">
+              <option value="word">말씀모임</option>
+              <option value="prayer">기도모임</option>
+            </select>
 
             <label for="word-room-name">방 이름</label>
 
@@ -1236,7 +1273,7 @@
               id="word-room-name"
               type="text"
               maxlength="60"
-              placeholder="예: 워십팀 말씀방"
+              placeholder="예: 청년 말씀모임"
             >
 
             <label for="word-room-description">방 설명</label>
@@ -1245,7 +1282,7 @@
               id="word-room-description"
               maxlength="500"
               rows="4"
-              placeholder="말씀방을 간단히 소개해주세요"
+              placeholder="모임을 간단히 소개해주세요"
             ></textarea>
 
             <button
@@ -1254,7 +1291,7 @@
               type="button"
               onclick="saveWordRoom()"
             >
-              말씀방 만들기
+              모임방 만들기
             </button>
 
             <button
@@ -1280,7 +1317,7 @@
 
         <div class="page-card">
 
-          <h2>내가 참여 중인 말씀방</h2>
+          <h2>내가 참여 중인 모임방</h2>
 
           <div id="word-room-list" class="word-room-list"></div>
 
@@ -1295,7 +1332,7 @@
 
       <header class="app-header">
 
-        <h1 id="word-room-detail-name" class="header-title">말씀방</h1>
+        <h1 id="word-room-detail-name" class="header-title">모임방</h1>
 
         <button
           class="header-button"
@@ -1312,7 +1349,7 @@
 
         <div class="page-card">
 
-          <h2>말씀방 안내</h2>
+          <h2 id="word-room-detail-heading">모임방 안내</h2>
 
           <p id="word-room-detail-description"></p>
 
@@ -1336,7 +1373,7 @@
 
         <div id="word-room-invite-section" class="page-card" hidden>
           <h2>회원 초대</h2>
-          <p>승인된 회원을 이 말씀방에 초대할 수 있습니다.</p>
+          <p>승인된 회원을 이 모임방에 초대할 수 있습니다.</p>
           <div class="word-room-invite-form">
             <select id="word-room-invite-member" aria-label="초대할 회원"></select>
             <button id="word-room-invite-button" class="primary-button" type="button" onclick="inviteWordRoomMember()">회원 초대</button>
@@ -1344,12 +1381,12 @@
         </div>
 
         <div id="word-room-plan-form-section" class="page-card" hidden>
-          <h2>말씀 계획 설정</h2>
-          <p>날짜별로 함께 읽을 말씀을 정해주세요.</p>
+          <h2 id="word-room-plan-form-heading">말씀 계획 설정</h2>
+          <p id="word-room-plan-form-description">날짜별로 함께 읽을 말씀을 정해주세요.</p>
           <div class="word-room-plan-form">
-            <label for="word-room-plan-date">읽는 날짜</label>
+            <label id="word-room-plan-date-label" for="word-room-plan-date">읽는 날짜</label>
             <input id="word-room-plan-date" type="date">
-            <label for="word-room-plan-passage">읽을 말씀</label>
+            <label id="word-room-plan-passage-label" for="word-room-plan-passage">읽을 말씀</label>
             <input id="word-room-plan-passage" type="text" maxlength="120" placeholder="예: 요한복음 1장">
             <label for="word-room-plan-note">안내 (선택)</label>
             <textarea id="word-room-plan-note" maxlength="500" rows="3" placeholder="함께 나누고 싶은 안내를 적어주세요"></textarea>
@@ -1360,7 +1397,7 @@
         </div>
 
         <div class="page-card">
-          <h2>날짜별 말씀 계획</h2>
+          <h2 id="word-room-plan-list-heading">날짜별 말씀 계획</h2>
           <div id="word-room-plan-list" class="word-room-plan-list"></div>
           <button id="word-room-plan-toggle-button" class="secondary-button" type="button" onclick="toggleWordRoomPlans()" hidden>전체 계획 보기</button>
         </div>
