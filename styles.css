@@ -1624,3 +1624,108 @@
     body[data-font-size="extra-large"] h3 { font-size: 22px !important; }
 
     body .prayer-delete-button { font-size: 12px !important; }
+
+    /* ========================================
+       공통 마무리 디자인 / 휴대폰 최적화
+    ======================================== */
+
+    .compact-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 4px;
+      margin-top: 10px;
+    }
+
+    .compact-action-button {
+      width: auto !important;
+      min-width: 0 !important;
+      min-height: 36px !important;
+      height: 36px !important;
+      margin: 0 !important;
+      padding: 6px 9px !important;
+      border: 0 !important;
+      border-radius: 8px !important;
+      background: transparent !important;
+      box-shadow: none !important;
+      color: #7C756E !important;
+      font-size: 12px !important;
+      font-weight: 600 !important;
+      line-height: 1 !important;
+      justify-self: end;
+    }
+
+    .compact-action-button:hover,
+    .compact-action-button:focus-visible {
+      background: #F1ECE5 !important;
+      color: #51483F !important;
+      outline: 2px solid #D8CFC2;
+      outline-offset: 1px;
+    }
+
+    .prayer-record-actions .compact-action-button:first-of-type {
+      margin-left: auto !important;
+    }
+
+    .memory-verse-select-label {
+      display: block;
+      margin: 18px 0 7px;
+      color: #443C34;
+      font-weight: 700;
+    }
+
+    .memory-verse-select {
+      width: 100%;
+      min-height: 50px;
+      padding: 11px 13px;
+      border: 1px solid #D8CFC2;
+      border-radius: 14px;
+      background: #FFFFFF;
+      color: #443C34;
+      font: inherit;
+    }
+
+    .memory-admin-verse-list { display: grid; gap: 8px; margin-top: 12px; }
+    .memory-admin-verse-row {
+      display: grid;
+      gap: 6px;
+      padding: 12px;
+      border: 1px solid #E5DDD2;
+      border-radius: 12px;
+      background: #FFFFFF;
+    }
+    .memory-admin-verse-row > span { color: #51483F; font-weight: 700; }
+
+    .prayer-topic-card { border-left: 4px solid #BCA7C0; }
+
+    .page-card,
+    .prayer-record-card,
+    .gratitude-record-card,
+    .word-note-card,
+    .word-room-card,
+    .news-card {
+      box-shadow: 0 4px 18px rgba(78, 67, 55, 0.045);
+    }
+
+    input:focus-visible,
+    textarea:focus-visible,
+    select:focus-visible,
+    button:focus-visible {
+      outline: 3px solid rgba(128, 109, 85, 0.24);
+      outline-offset: 2px;
+    }
+
+    @media (max-width: 520px) {
+      .start-screen { padding: 18px; }
+      .login-box { padding: 22px 18px; border-radius: 20px; }
+      .page-content { padding-left: 14px; padding-right: 14px; }
+      .page-card { padding: 18px 16px; border-radius: 18px; }
+      .app-header { padding-left: 16px; padding-right: 16px; }
+      .menu-grid { gap: 10px; }
+      .menu-button { min-height: 104px; padding: 14px 8px; }
+      .memory-chunk-button,
+      .memory-selected-chunk { width: 100%; justify-content: flex-start; text-align: left; }
+      .word-room-member-actions { grid-template-columns: 1fr; }
+      .mypage-profile-list div { grid-template-columns: 78px 1fr; }
+      .bottom-nav-inner { padding-left: 8px; padding-right: 8px; }
+    }

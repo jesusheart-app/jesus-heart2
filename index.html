@@ -10,9 +10,15 @@
   >
 
   <meta name="theme-color" content="#F7F3EA">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="예수마음">
 
   <title>예수마음</title>
 
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./app-icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./app-icon.svg">
   <link rel="stylesheet" href="./styles.css">
 </head>
 
@@ -1145,15 +1151,20 @@
             요한일서 4장 15절~21절
           </p>
 
+          <label class="memory-verse-select-label" for="memory-verse-select">연습할 말씀</label>
+          <select id="memory-verse-select" class="memory-verse-select" onchange="selectMemoryVerse()"></select>
+
           <div id="memory-passage-text" class="memory-passage-text"></div>
 
           <div id="memory-passage-admin" class="memory-passage-admin" hidden>
-            <p>관리자는 모든 회원이 연습할 암송 말씀을 설정할 수 있습니다.</p>
+            <p>암송 말씀을 한 절씩 등록하고 이번 달 말씀을 선택할 수 있습니다.</p>
             <label for="memory-passage-reference">말씀 위치</label>
             <input id="memory-passage-reference" type="text" maxlength="100" placeholder="예: 요한일서 4장 15절~21절">
             <label for="memory-passage-content">말씀 본문</label>
             <textarea id="memory-passage-content" maxlength="3000" rows="8" placeholder="암송할 말씀 본문을 붙여넣어 주세요"></textarea>
-            <button id="memory-passage-save-button" class="secondary-button" type="button" onclick="saveMemoryPassage()">암송 말씀 저장</button>
+            <button id="memory-passage-save-button" class="secondary-button" type="button" onclick="saveMemoryPassage()">새 암송 말씀 추가</button>
+            <button id="memory-passage-cancel-button" class="text-button" type="button" onclick="resetMemoryPassageForm()" hidden>수정 취소</button>
+            <div id="memory-admin-verse-list" class="memory-admin-verse-list"></div>
           </div>
 
         </div>
@@ -1394,6 +1405,27 @@
             <button id="word-room-plan-cancel-button" class="secondary-button" type="button" onclick="resetWordRoomPlanForm()" hidden>수정 취소</button>
             <div id="word-room-plan-message" class="start-message word-room-message" aria-live="polite"></div>
           </div>
+        </div>
+
+        <div id="word-room-prayer-topic-form-section" class="page-card" hidden>
+          <h2>나의 기도제목 나누기</h2>
+          <p>방장의 계획을 기다리지 않아도 참여자가 직접 기도 제목을 나눌 수 있습니다.</p>
+          <div class="word-room-plan-form">
+            <label for="word-room-prayer-topic-date">기도 날짜</label>
+            <input id="word-room-prayer-topic-date" type="date">
+            <label for="word-room-prayer-topic-title">기도 제목</label>
+            <input id="word-room-prayer-topic-title" type="text" maxlength="120" placeholder="함께 기도할 제목을 적어주세요">
+            <label for="word-room-prayer-topic-content">기도 내용 (선택)</label>
+            <textarea id="word-room-prayer-topic-content" maxlength="1000" rows="4" placeholder="함께 나누고 싶은 내용을 적어주세요"></textarea>
+            <button id="word-room-prayer-topic-save-button" class="primary-button" type="button" onclick="saveWordRoomPrayerTopic()">기도제목 나누기</button>
+            <button id="word-room-prayer-topic-cancel-button" class="text-button" type="button" onclick="resetWordRoomPrayerTopicForm()" hidden>수정 취소</button>
+            <div id="word-room-prayer-topic-message" class="start-message word-room-message" aria-live="polite"></div>
+          </div>
+        </div>
+
+        <div id="word-room-prayer-topic-list-section" class="page-card" hidden>
+          <h2>함께 나눈 기도제목</h2>
+          <div id="word-room-prayer-topic-list" class="word-room-plan-list"></div>
         </div>
 
         <div class="page-card">
