@@ -58,8 +58,12 @@ let memoryPassage = null;
 let memoryChunks = [];
 let memoryAvailableChunks = [];
 let memorySelectedChunks = [];
+let selectedMemoryVerseId = null;
+let editingMemoryVerseId = null;
 let newsCache = new Map();
 let editingNewsId = null;
+let wordRoomPrayerTopicCache = new Map();
+let editingWordRoomPrayerTopicId = null;
 
 const communityPrayerReactionTypes = [
   { key: "prayer", countField: "reactionPrayerCount", emoji: "🙏", label: "기도할게요" },
@@ -803,6 +807,96 @@ function getMemoryAssessmentLabel(value) {
   }[value] || "암송 완료";
 }
 
+function getMemoryVerses() {
+  if (Array.isArray(memoryPassage?.verses)) return memoryPassage.verses;
+  if (memoryPassage?.reference && memoryPassage?.content) {
+    return [{ id: "legacy", reference: memoryPassage.reference, content: memoryPassage.content }];
+  }
+  return [];
+}
+
+function getSelectedMemoryVerse() {
+  return getMemoryVerses().find((verse) => verse.id === selectedMemoryVerseId) || null;
+}
+
+function createMemoryVerseId() {
+  return "verse-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7);
+}
+
+function resetMemoryPassageForm() {
+  editingMemoryVerseId = null;
+  document.getElementById("memory-passage-reference").value = "";
+  document.getElementById("memory-passage-content").value = "";
+  document.getElementById("memory-passage-save-button").textContent = "새 암송 말씀 추가";
+  document.getElementById("memory-passage-cancel-button").hidden = true;
+}
+
+function renderMemoryAdminVerseList() {
+  const list = document.getElementById("memory-admin-verse-list");
+  list.replaceChildren();
+  getMemoryVerses().forEach((verse) => {
+    const row = document.createElement("div");
+    row.className = "memory-admin-verse-row";
+    const label = document.createElement("span");
+    label.textContent = verse.reference + (verse.id === memoryPassage?.currentVerseId ? " · 이번 달" : "");
+    const actions = document.createElement("div");
+    actions.className = "compact-actions";
+    if (verse.id !== memoryPassage?.currentVerseId) {
+      actions.append(createPrayerActionButton("이번 달로 지정", "compact-action-button", () => setCurrentMemoryVerse(verse.id)));
+    }
+    actions.append(
+      createPrayerActionButton("✎ 수정", "compact-action-button", () => editMemoryVerse(verse.id)),
+      createPrayerActionButton("× 삭제", "compact-action-button", () => deleteMemoryVerse(verse.id))
+    );
+    row.append(label, actions);
+    list.append(row);
+  });
+}
+
+function renderMemoryVerseSelection() {
+  const verses = getMemoryVerses();
+  const select = document.getElementById("memory-verse-select");
+  select.replaceChildren();
+  if (verses.length === 0) {
+    const option = document.createElement("option");
+    option.textContent = "등록된 암송 말씀이 없습니다";
+    option.value = "";
+    select.append(option);
+    select.disabled = true;
+    selectedMemoryVerseId = null;
+  } else {
+    select.disabled = false;
+    verses.forEach((verse) => {
+      const option = document.createElement("option");
+      option.value = verse.id;
+      option.textContent = verse.reference + (verse.id === memoryPassage?.currentVerseId ? " · 이번 달" : " · 지난 말씀 복습");
+      select.append(option);
+    });
+    if (!verses.some((verse) => verse.id === selectedMemoryVerseId)) {
+      selectedMemoryVerseId = memoryPassage?.currentVerseId || verses[0].id;
+    }
+    select.value = selectedMemoryVerseId;
+  }
+  applySelectedMemoryVerse();
+}
+
+function applySelectedMemoryVerse() {
+  const verse = getSelectedMemoryVerse();
+  document.querySelector(".memory-passage").textContent = verse?.reference || "암송 말씀 준비 중";
+  document.getElementById("memory-passage-text").textContent = verse
+    ? (verse.id === memoryPassage?.currentVerseId ? "이번 달 암송 말씀입니다." : "지난 말씀을 복습하고 있습니다.")
+    : "관리자가 말씀을 등록하면 순서 맞추기 연습이 열립니다.";
+  memoryChunks = splitMemoryPassage(verse?.content || "");
+  document.getElementById("memory-check-toggle-button").hidden = !verse;
+  resetMemoryPractice();
+}
+
+function selectMemoryVerse() {
+  selectedMemoryVerseId = document.getElementById("memory-verse-select").value;
+  applySelectedMemoryVerse();
+  loadMemoryChecks();
+}
+
 function splitMemoryPassage(content) {
   const words = content.replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
   if (words.length < 2) return words;
@@ -903,20 +997,16 @@ function showMemoryAnswer() {
 async function loadMemoryPassage() {
   const snapshot = await getDoc(doc(db, "memoryPassages", "current"));
   memoryPassage = snapshot.exists() ? snapshot.data() : null;
-  const reference = memoryPassage?.reference || "요한일서 4장 15절~21절";
-  const content = memoryPassage?.content || "";
-  document.querySelector(".memory-passage").textContent = reference;
-  document.getElementById("memory-passage-text").textContent = content
-    ? "말씀을 먼저 소리 내어 읽은 뒤 아래에서 순서를 확인해보세요."
-    : "관리자가 말씀 본문을 등록하면 순서 맞추기 연습이 열립니다.";
+  const verses = getMemoryVerses();
+  if (!memoryPassage?.currentVerseId && verses.length) memoryPassage.currentVerseId = verses[0].id;
+  selectedMemoryVerseId = memoryPassage?.currentVerseId || verses[0]?.id || null;
   const admin = document.getElementById("memory-passage-admin");
   admin.hidden = currentUserProfile?.role !== "admin";
   if (!admin.hidden) {
-    document.getElementById("memory-passage-reference").value = reference;
-    document.getElementById("memory-passage-content").value = content;
+    resetMemoryPassageForm();
+    renderMemoryAdminVerseList();
   }
-  memoryChunks = splitMemoryPassage(content);
-  resetMemoryPractice();
+  renderMemoryVerseSelection();
 }
 
 async function saveMemoryPassage() {
@@ -927,21 +1017,67 @@ async function saveMemoryPassage() {
     setMessage("memory-check-message", "말씀 위치와 본문을 확인해주세요.", "error");
     return;
   }
-  setBusy("memory-passage-save-button", true, "저장 중...", "암송 말씀 저장");
+  const wasEditing = Boolean(editingMemoryVerseId);
+  setBusy("memory-passage-save-button", true, "저장 중...", wasEditing ? "암송 말씀 수정" : "새 암송 말씀 추가");
   try {
+    const verses = getMemoryVerses().map((verse) => ({ ...verse }));
+    if (editingMemoryVerseId) {
+      const verse = verses.find((item) => item.id === editingMemoryVerseId);
+      if (!verse) throw new Error("Verse not found");
+      verse.reference = reference;
+      verse.content = content;
+    } else {
+      verses.push({ id: createMemoryVerseId(), reference, content });
+    }
+    const currentVerseId = memoryPassage?.currentVerseId || verses[0].id;
     await setDoc(doc(db, "memoryPassages", "current"), {
-      reference,
-      content,
+      verses,
+      currentVerseId,
       updatedBy: auth.currentUser.uid,
       updatedAt: serverTimestamp()
     });
     await loadMemoryPassage();
-    setMessage("memory-check-message", "암송 말씀을 저장했습니다.", "success");
+    setMessage("memory-check-message", wasEditing ? "암송 말씀을 수정했습니다." : "암송 말씀을 추가했습니다.", "success");
   } catch {
     setMessage("memory-check-message", "암송 말씀을 저장하지 못했습니다.", "error");
   } finally {
-    setBusy("memory-passage-save-button", false, "저장 중...", "암송 말씀 저장");
+    setBusy("memory-passage-save-button", false, "저장 중...", "새 암송 말씀 추가");
   }
+}
+
+function editMemoryVerse(verseId) {
+  const verse = getMemoryVerses().find((item) => item.id === verseId);
+  if (!verse) return;
+  editingMemoryVerseId = verseId;
+  document.getElementById("memory-passage-reference").value = verse.reference;
+  document.getElementById("memory-passage-content").value = verse.content;
+  document.getElementById("memory-passage-save-button").textContent = "암송 말씀 수정";
+  document.getElementById("memory-passage-cancel-button").hidden = false;
+}
+
+async function persistMemoryVerses(verses, currentVerseId) {
+  await setDoc(doc(db, "memoryPassages", "current"), {
+    verses, currentVerseId, updatedBy: auth.currentUser.uid, updatedAt: serverTimestamp()
+  });
+  await loadMemoryPassage();
+}
+
+async function setCurrentMemoryVerse(verseId) {
+  if (currentUserProfile?.role !== "admin") return;
+  try {
+    await persistMemoryVerses(getMemoryVerses(), verseId);
+    setMessage("memory-check-message", "이번 달 암송 말씀을 변경했습니다.", "success");
+  } catch { setMessage("memory-check-message", "이번 달 말씀을 변경하지 못했습니다.", "error"); }
+}
+
+async function deleteMemoryVerse(verseId) {
+  if (currentUserProfile?.role !== "admin" || !window.confirm("이 암송 말씀을 삭제하시겠습니까?")) return;
+  const verses = getMemoryVerses().filter((verse) => verse.id !== verseId);
+  const currentVerseId = memoryPassage?.currentVerseId === verseId ? (verses[0]?.id || "") : memoryPassage.currentVerseId;
+  try {
+    await persistMemoryVerses(verses, currentVerseId);
+    setMessage("memory-check-message", "암송 말씀을 삭제했습니다.", "success");
+  } catch { setMessage("memory-check-message", "암송 말씀을 삭제하지 못했습니다.", "error"); }
 }
 
 function renderMemoryCheckState(record) {
@@ -981,7 +1117,7 @@ function renderMemoryCheckHistory(documents) {
     row.className = "memory-check-history-row";
 
     const date = document.createElement("span");
-    date.textContent = formatBibleCheckDate(record.id);
+    date.textContent = formatBibleCheckDate(record.id) + (record.data().verseReference ? " · " + record.data().verseReference : "");
 
     const state = document.createElement("span");
     state.className = "memory-check-history-state";
@@ -1001,7 +1137,9 @@ async function loadMemoryChecks() {
     )
   ]);
 
-  renderMemoryCheckState(todaySnapshot.exists() ? todaySnapshot.data() : null);
+  const todayRecord = todaySnapshot.exists() && (!todaySnapshot.data().verseId || todaySnapshot.data().verseId === selectedMemoryVerseId)
+    ? todaySnapshot.data() : null;
+  renderMemoryCheckState(todayRecord);
   renderMemoryCheckHistory(historySnapshot.docs);
 }
 
@@ -1015,7 +1153,8 @@ async function openMemoryCheck() {
   setMessage("memory-check-message", "암송 기록을 불러오는 중입니다.");
 
   try {
-    await Promise.all([loadMemoryChecks(), loadMemoryPassage()]);
+    await loadMemoryPassage();
+    await loadMemoryChecks();
     setMessage("memory-check-message", "");
   } catch {
     setMessage(
@@ -1086,6 +1225,8 @@ async function saveMemoryAssessment(assessment, options = {}) {
       date: today,
       completed: assessment === "memorized",
       assessment,
+      verseId: selectedMemoryVerseId || "legacy",
+      verseReference: getSelectedMemoryVerse()?.reference || "암송 말씀",
       createdAt: existing.exists() ? existing.data().createdAt : serverTimestamp(),
       updatedAt: serverTimestamp()
     });
@@ -1209,13 +1350,13 @@ function renderPrivatePrayers(documents) {
         () => togglePrivatePrayerStatus(prayer.id)
       ),
       createPrayerActionButton(
-        "수정",
-        "secondary-button prayer-small-button",
+        "✎ 수정",
+        "compact-action-button",
         () => editPrivatePrayer(prayer.id)
       ),
       createPrayerActionButton(
-        "삭제",
-        "secondary-button prayer-small-button prayer-delete-button",
+        "× 삭제",
+        "compact-action-button",
         () => deletePrivatePrayer(prayer.id)
       )
     );
@@ -1650,8 +1791,8 @@ async function renderCommunityPrayerComments(prayer, container) {
         if (comment.uid === auth.currentUser?.uid) {
           const remove = document.createElement("button");
           remove.type = "button";
-          remove.className = "prayer-comment-delete";
-          remove.textContent = "삭제";
+          remove.className = "compact-action-button";
+          remove.textContent = "× 삭제";
           remove.addEventListener("click", () =>
             deleteCommunityPrayerComment(prayer, comment, container)
           );
@@ -1731,13 +1872,13 @@ function renderCommunityPrayers(documents) {
       actions.className = "prayer-record-actions";
       actions.append(
         createPrayerActionButton(
-          "수정",
-          "secondary-button prayer-small-button",
+          "✎ 수정",
+          "compact-action-button",
           () => editCommunityPrayer(prayer.id)
         ),
         createPrayerActionButton(
-          "삭제",
-          "secondary-button prayer-small-button prayer-delete-button",
+          "× 삭제",
+          "compact-action-button",
           () => deleteCommunityPrayer(prayer.id)
         )
       );
@@ -2011,13 +2152,13 @@ function renderWordNotes(documents) {
     actions.className = "prayer-record-actions";
     actions.append(
       createPrayerActionButton(
-        "수정",
-        "secondary-button prayer-small-button",
+        "✎ 수정",
+        "compact-action-button",
         () => editWordNote(note.id)
       ),
       createPrayerActionButton(
-        "삭제",
-        "secondary-button prayer-small-button prayer-delete-button",
+        "× 삭제",
+        "compact-action-button",
         () => deleteWordNote(note.id)
       )
     );
@@ -2264,13 +2405,13 @@ function renderPrivateGratitudes(documents) {
     actions.className = "prayer-record-actions";
     actions.append(
       createPrayerActionButton(
-        "수정",
-        "secondary-button prayer-small-button",
+        "✎ 수정",
+        "compact-action-button",
         () => editPrivateGratitude(gratitude.id)
       ),
       createPrayerActionButton(
-        "삭제",
-        "secondary-button prayer-small-button prayer-delete-button",
+        "× 삭제",
+        "compact-action-button",
         () => deletePrivateGratitude(gratitude.id)
       )
     );
@@ -2726,8 +2867,8 @@ async function renderCommunityGratitudeComments(
         if (comment.uid === auth.currentUser?.uid) {
           const remove = document.createElement("button");
           remove.type = "button";
-          remove.className = "prayer-comment-delete";
-          remove.textContent = "삭제";
+          remove.className = "compact-action-button";
+          remove.textContent = "× 삭제";
           remove.addEventListener("click", () =>
             deleteCommunityGratitudeComment(
               gratitude,
@@ -2813,13 +2954,13 @@ function renderCommunityGratitudes(documents) {
       actions.className = "prayer-record-actions";
       actions.append(
         createPrayerActionButton(
-          "수정",
-          "secondary-button prayer-small-button",
+          "✎ 수정",
+          "compact-action-button",
           () => editCommunityGratitude(gratitude.id)
         ),
         createPrayerActionButton(
-          "삭제",
-          "secondary-button prayer-small-button prayer-delete-button",
+          "× 삭제",
+          "compact-action-button",
           () => deleteCommunityGratitude(gratitude.id)
         )
       );
@@ -3122,13 +3263,13 @@ function renderWordRooms(documents) {
     if (canManageWordRoom(room)) {
       actions.append(
         createPrayerActionButton(
-          "방 정보 수정",
-          "secondary-button word-room-action-button",
+          "✎ 수정",
+          "compact-action-button",
           () => editWordRoom(room.id)
         ),
         createPrayerActionButton(
-          "방 삭제",
-          "secondary-button word-room-action-button prayer-delete-button",
+          "× 삭제",
+          "compact-action-button",
           () => deleteWordRoom(room.id)
         )
       );
@@ -3523,10 +3664,10 @@ function renderWordRoomPlans(plans, room) {
     }
     if (room.leaderUid === auth.currentUser.uid) {
       const actions = document.createElement("div");
-      actions.className = "word-room-plan-actions";
+      actions.className = "compact-actions";
       actions.append(
-        createPrayerActionButton("수정", "secondary-button word-room-member-button", () => editWordRoomPlan(plan.id)),
-        createPrayerActionButton("삭제", "secondary-button word-room-member-button prayer-delete-button", () => deleteWordRoomPlan(plan.id))
+        createPrayerActionButton("✎ 수정", "compact-action-button", () => editWordRoomPlan(plan.id)),
+        createPrayerActionButton("× 삭제", "compact-action-button", () => deleteWordRoomPlan(plan.id))
       );
       card.append(actions);
     }
@@ -3615,7 +3756,7 @@ async function renderWordRoomPlanComments(room, plan, container) {
       reactions.append(button);
     });
     row.append(meta, content, reactions);
-    if (comment.uid === auth.currentUser.uid) row.append(createPrayerActionButton("삭제", "secondary-button word-room-member-button prayer-delete-button", () => deleteWordRoomPlanComment(room, plan, comment, container)));
+    if (comment.uid === auth.currentUser.uid) row.append(createPrayerActionButton("× 삭제", "compact-action-button", () => deleteWordRoomPlanComment(room, plan, comment, container)));
     container.append(row);
   }
   const textarea = document.createElement("textarea");
@@ -3714,6 +3855,175 @@ async function deleteWordRoomPlan(planId) {
   }
 }
 
+function resetWordRoomPrayerTopicForm() {
+  editingWordRoomPrayerTopicId = null;
+  document.getElementById("word-room-prayer-topic-date").value = getTodayDateKey();
+  document.getElementById("word-room-prayer-topic-title").value = "";
+  document.getElementById("word-room-prayer-topic-content").value = "";
+  document.getElementById("word-room-prayer-topic-save-button").textContent = "기도제목 나누기";
+  document.getElementById("word-room-prayer-topic-cancel-button").hidden = true;
+  setMessage("word-room-prayer-topic-message", "");
+}
+
+async function saveWordRoomPrayerTopic() {
+  const room = wordRoomCache.get(currentWordRoomId);
+  if (!room || getWordRoomType(room) !== "prayer" || !room.memberUids.includes(auth.currentUser.uid)) return;
+  const date = document.getElementById("word-room-prayer-topic-date").value;
+  const title = document.getElementById("word-room-prayer-topic-title").value.trim();
+  const content = document.getElementById("word-room-prayer-topic-content").value.trim();
+  if (!date || !title || title.length > 120 || content.length > 1000) {
+    setMessage("word-room-prayer-topic-message", "날짜와 기도 제목을 확인해주세요.", "error");
+    return;
+  }
+  const wasEditing = Boolean(editingWordRoomPrayerTopicId);
+  try {
+    if (wasEditing) {
+      const topic = wordRoomPrayerTopicCache.get(editingWordRoomPrayerTopicId);
+      if (!topic || topic.uid !== auth.currentUser.uid) return;
+      await updateDoc(doc(db, "wordRooms", room.id, "prayerTopics", topic.id), {
+        date, title, content, updatedAt: serverTimestamp()
+      });
+    } else {
+      await setDoc(doc(collection(db, "wordRooms", room.id, "prayerTopics")), {
+        uid: auth.currentUser.uid,
+        authorDisplay: currentUserProfile.name,
+        date, title, content,
+        reactionAmenCount: 0,
+        reactionPrayerCount: 0,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+    }
+    resetWordRoomPrayerTopicForm();
+    await loadWordRoomPrayerTopics(room);
+    setMessage("word-room-prayer-topic-message", wasEditing ? "기도 제목을 수정했습니다." : "기도 제목을 나눴습니다.", "success");
+  } catch { setMessage("word-room-prayer-topic-message", "기도 제목을 저장하지 못했습니다.", "error"); }
+}
+
+function editWordRoomPrayerTopic(topicId) {
+  const topic = wordRoomPrayerTopicCache.get(topicId);
+  if (!topic || topic.uid !== auth.currentUser.uid) return;
+  editingWordRoomPrayerTopicId = topicId;
+  document.getElementById("word-room-prayer-topic-date").value = topic.date;
+  document.getElementById("word-room-prayer-topic-title").value = topic.title;
+  document.getElementById("word-room-prayer-topic-content").value = topic.content || "";
+  document.getElementById("word-room-prayer-topic-save-button").textContent = "기도제목 수정";
+  document.getElementById("word-room-prayer-topic-cancel-button").hidden = false;
+}
+
+async function deleteWordRoomPrayerTopic(topicId) {
+  const room = wordRoomCache.get(currentWordRoomId);
+  const topic = wordRoomPrayerTopicCache.get(topicId);
+  if (!room || !topic || (topic.uid !== auth.currentUser.uid && !canManageWordRoom(room)) || !window.confirm("이 기도 제목을 삭제하시겠습니까?")) return;
+  try {
+    const comments = await getDocs(collection(db, "wordRooms", room.id, "prayerTopics", topicId, "comments"));
+    const batch = writeBatch(db);
+    comments.docs.forEach((comment) => batch.delete(comment.ref));
+    batch.delete(doc(db, "wordRooms", room.id, "prayerTopics", topicId));
+    await batch.commit();
+    await loadWordRoomPrayerTopics(room);
+  } catch { setMessage("word-room-detail-message", "기도 제목을 삭제하지 못했습니다.", "error"); }
+}
+
+async function toggleWordRoomPrayerTopicReaction(room, topic, type, card) {
+  if (topic.uid === auth.currentUser.uid) return;
+  const topicRef = doc(db, "wordRooms", room.id, "prayerTopics", topic.id);
+  const reactionRef = doc(db, "wordRooms", room.id, "prayerTopics", topic.id, "privateReactions", auth.currentUser.uid);
+  try {
+    await runTransaction(db, async (transaction) => {
+      const [topicSnapshot, reactionSnapshot] = await Promise.all([transaction.get(topicRef), transaction.get(reactionRef)]);
+      if (!topicSnapshot.exists()) throw new Error("Topic not found");
+      const current = reactionSnapshot.exists() ? reactionSnapshot.data() : { amen: false, prayer: false };
+      const next = { amen: current.amen === true, prayer: current.prayer === true };
+      next[type] = !next[type];
+      const field = type === "amen" ? "reactionAmenCount" : "reactionPrayerCount";
+      transaction.update(topicRef, { [field]: Math.max(0, (topicSnapshot.data()[field] || 0) + (next[type] ? 1 : -1)) });
+      transaction.set(reactionRef, { ...next, updatedAt: serverTimestamp() });
+    });
+    await renderWordRoomPrayerTopicCard(room, topic.id, card);
+  } catch { setMessage("word-room-detail-message", "반응을 저장하지 못했습니다.", "error"); }
+}
+
+async function saveWordRoomPrayerTopicComment(room, topic, textarea, comments) {
+  const content = textarea.value.trim();
+  if (!content || content.length > 500) return;
+  try {
+    await setDoc(doc(collection(db, "wordRooms", room.id, "prayerTopics", topic.id, "comments")), {
+      uid: auth.currentUser.uid, authorDisplay: currentUserProfile.name, content, createdAt: serverTimestamp()
+    });
+    textarea.value = "";
+    await renderWordRoomPrayerTopicComments(room, topic, comments);
+  } catch { setMessage("word-room-detail-message", "댓글을 저장하지 못했습니다.", "error"); }
+}
+
+async function deleteWordRoomPrayerTopicComment(room, topic, commentId, comments) {
+  if (!window.confirm("이 댓글을 삭제하시겠습니까?")) return;
+  try {
+    await deleteDoc(doc(db, "wordRooms", room.id, "prayerTopics", topic.id, "comments", commentId));
+    await renderWordRoomPrayerTopicComments(room, topic, comments);
+  } catch { setMessage("word-room-detail-message", "댓글을 삭제하지 못했습니다.", "error"); }
+}
+
+async function renderWordRoomPrayerTopicComments(room, topic, container) {
+  container.replaceChildren();
+  const snapshot = await getDocs(query(collection(db, "wordRooms", room.id, "prayerTopics", topic.id, "comments"), orderBy("createdAt", "asc"), limit(50)));
+  snapshot.docs.forEach((item) => {
+    const comment = { id: item.id, ...item.data() };
+    const row = document.createElement("article");
+    row.className = "word-room-comment";
+    const name = document.createElement("strong"); name.textContent = comment.authorDisplay;
+    const content = document.createElement("p"); content.textContent = comment.content;
+    row.append(name, content);
+    if (comment.uid === auth.currentUser.uid) row.append(createPrayerActionButton("× 삭제", "compact-action-button", () => deleteWordRoomPrayerTopicComment(room, topic, comment.id, container)));
+    container.append(row);
+  });
+  const textarea = document.createElement("textarea");
+  textarea.maxLength = 500; textarea.rows = 2; textarea.placeholder = "격려와 기도 댓글을 남겨주세요";
+  container.append(textarea, createPrayerActionButton("댓글 남기기", "primary-button", () => saveWordRoomPrayerTopicComment(room, topic, textarea, container)));
+}
+
+async function renderWordRoomPrayerTopicCard(room, topicId, existingCard = null) {
+  const snapshot = await getDoc(doc(db, "wordRooms", room.id, "prayerTopics", topicId));
+  if (!snapshot.exists()) return;
+  const topic = { id: snapshot.id, ...snapshot.data() };
+  wordRoomPrayerTopicCache.set(topic.id, topic);
+  const card = document.createElement("article");
+  card.className = "word-room-plan-card prayer-topic-card";
+  const meta = document.createElement("strong"); meta.textContent = topic.authorDisplay + " · " + topic.date;
+  const title = document.createElement("h3"); title.textContent = topic.title;
+  card.append(meta, title);
+  if (topic.content) { const content = document.createElement("p"); content.textContent = topic.content; card.append(content); }
+  const reactions = document.createElement("div"); reactions.className = "word-room-comment-reactions";
+  let mine = { amen: false, prayer: false };
+  if (topic.uid !== auth.currentUser.uid) {
+    const mineSnapshot = await getDoc(doc(db, "wordRooms", room.id, "prayerTopics", topic.id, "privateReactions", auth.currentUser.uid));
+    if (mineSnapshot.exists()) mine = mineSnapshot.data();
+  }
+  [["amen", "🙌 아멘", "reactionAmenCount"], ["prayer", "🙏 함께 기도해요", "reactionPrayerCount"]].forEach(([type, label, field]) => {
+    const button = createPrayerActionButton(label + " " + (topic[field] || 0), "secondary-button word-room-reaction-button" + (mine[type] ? " active" : ""), () => toggleWordRoomPrayerTopicReaction(room, topic, type, card));
+    button.disabled = topic.uid === auth.currentUser.uid; reactions.append(button);
+  });
+  card.append(reactions);
+  if (topic.uid === auth.currentUser.uid || canManageWordRoom(room)) {
+    const actions = document.createElement("div"); actions.className = "compact-actions";
+    if (topic.uid === auth.currentUser.uid) actions.append(createPrayerActionButton("✎ 수정", "compact-action-button", () => editWordRoomPrayerTopic(topic.id)));
+    actions.append(createPrayerActionButton("× 삭제", "compact-action-button", () => deleteWordRoomPrayerTopic(topic.id)));
+    card.append(actions);
+  }
+  const comments = document.createElement("div"); comments.className = "word-room-plan-comments"; card.append(comments);
+  await renderWordRoomPrayerTopicComments(room, topic, comments);
+  if (existingCard?.parentNode) existingCard.replaceWith(card);
+  return card;
+}
+
+async function loadWordRoomPrayerTopics(room) {
+  const list = document.getElementById("word-room-prayer-topic-list");
+  list.replaceChildren(); wordRoomPrayerTopicCache = new Map();
+  const snapshot = await getDocs(query(collection(db, "wordRooms", room.id, "prayerTopics"), orderBy("createdAt", "desc"), limit(50)));
+  if (snapshot.empty) { const empty = document.createElement("p"); empty.className = "word-room-empty"; empty.textContent = "아직 나눈 기도 제목이 없습니다."; list.append(empty); return; }
+  for (const item of snapshot.docs) list.append(await renderWordRoomPrayerTopicCard(room, item.id));
+}
+
 async function openWordRoom(roomId) {
   const room = wordRoomCache.get(roomId);
   if (!room) {
@@ -3734,8 +4044,16 @@ async function openWordRoom(roomId) {
   setMessage("word-room-detail-message", "참여자 목록을 불러오는 중입니다.");
   try {
     await refreshCurrentWordRoom();
+    const refreshedRoom = wordRoomCache.get(roomId);
     resetWordRoomPlanForm();
-    await loadWordRoomPlans(wordRoomCache.get(roomId));
+    await loadWordRoomPlans(refreshedRoom);
+    const isPrayer = getWordRoomType(refreshedRoom) === "prayer";
+    document.getElementById("word-room-prayer-topic-form-section").hidden = !isPrayer;
+    document.getElementById("word-room-prayer-topic-list-section").hidden = !isPrayer;
+    if (isPrayer) {
+      resetWordRoomPrayerTopicForm();
+      await loadWordRoomPrayerTopics(refreshedRoom);
+    }
     setMessage("word-room-detail-message", "");
   } catch { setMessage("word-room-detail-message", "참여자 목록을 불러오지 못했습니다.", "error"); }
 }
@@ -3832,8 +4150,8 @@ function renderNews(documents) {
       const actions = document.createElement("div");
       actions.className = "news-card-actions";
       actions.append(
-        createPrayerActionButton("수정", "secondary-button prayer-small-button", () => editNews(news.id)),
-        createPrayerActionButton("삭제", "secondary-button prayer-small-button prayer-delete-button", () => deleteNews(news.id))
+        createPrayerActionButton("✎ 수정", "compact-action-button", () => editNews(news.id)),
+        createPrayerActionButton("× 삭제", "compact-action-button", () => deleteNews(news.id))
       );
       card.append(actions);
     }
@@ -4375,6 +4693,8 @@ window.toggleBibleCheck = toggleBibleCheck;
 window.openMemoryCheck = openMemoryCheck;
 window.toggleMemoryCheck = toggleMemoryCheck;
 window.saveMemoryPassage = saveMemoryPassage;
+window.resetMemoryPassageForm = resetMemoryPassageForm;
+window.selectMemoryVerse = selectMemoryVerse;
 window.resetMemoryPractice = resetMemoryPractice;
 window.undoMemoryChunk = undoMemoryChunk;
 window.checkMemoryPractice = checkMemoryPractice;
@@ -4396,6 +4716,8 @@ window.inviteWordRoomMember = inviteWordRoomMember;
 window.leaveWordRoom = leaveWordRoom;
 window.saveWordRoomPlan = saveWordRoomPlan;
 window.resetWordRoomPlanForm = resetWordRoomPlanForm;
+window.saveWordRoomPrayerTopic = saveWordRoomPrayerTopic;
+window.resetWordRoomPrayerTopicForm = resetWordRoomPrayerTopicForm;
 window.toggleWordRoomPlans = toggleWordRoomPlans;
 window.showGratitudeTab = showGratitudeTab;
 window.savePrivateGratitude = savePrivateGratitude;
