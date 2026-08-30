@@ -64,6 +64,9 @@ let newsCache = new Map();
 let editingNewsId = null;
 let wordRoomPrayerTopicCache = new Map();
 let editingWordRoomPrayerTopicId = null;
+let bibleCalendarDate = new Date();
+let bibleCheckRecordIds = new Set();
+let selectedMemoryYear = new Date().getFullYear();
 
 const communityPrayerReactionTypes = [
   { key: "prayer", countField: "reactionPrayerCount", emoji: "🙏", label: "기도할게요" },
@@ -608,9 +611,9 @@ function renderBibleCheckSelection(dateKey, isChecked) {
   status.dataset.checked = String(isChecked);
 
   button.dataset.checked = String(isChecked);
-  button.textContent = isChecked ? "이 날짜의 체크 삭제" : "말씀 읽음 체크하기";
+  button.textContent = isChecked ? "× 이 날짜 기록 삭제" : "말씀 읽음 체크하기";
   button.className = isChecked
-    ? "secondary-button"
+    ? "compact-action-button bible-check-delete-button"
     : "primary-button";
 }
 
@@ -639,40 +642,39 @@ async function loadBibleCheckForDate() {
 function renderBibleCheckHistory(documents) {
   const list = document.getElementById("bible-check-history");
   list.replaceChildren();
-
-  const records = documents
-    .filter((record) => record.data().checked === true)
-    .sort((first, second) => second.id.localeCompare(first.id));
-
-  if (records.length === 0) {
-    const empty = document.createElement("p");
-    empty.className = "bible-check-empty";
-    empty.textContent = "아직 기록한 날짜가 없습니다.";
-    list.append(empty);
-    return;
+  bibleCheckRecordIds = new Set(documents.filter((record) => record.data().checked === true).map((record) => record.id));
+  const year = bibleCalendarDate.getFullYear();
+  const month = bibleCalendarDate.getMonth();
+  document.getElementById("bible-calendar-title").textContent = year + "년 " + (month + 1) + "월";
+  const firstDay = new Date(year, month, 1).getDay();
+  const lastDate = new Date(year, month + 1, 0).getDate();
+  for (let blank = 0; blank < firstDay; blank += 1) {
+    const cell = document.createElement("span"); cell.className = "bible-calendar-blank"; list.append(cell);
   }
-
-  records.forEach((record) => {
-    const row = document.createElement("button");
-    row.type = "button";
-    row.className = "bible-check-history-row";
-
-    const date = document.createElement("span");
-    date.textContent = formatBibleCheckDate(record.id);
-
-    const state = document.createElement("span");
-    state.className = "bible-check-history-state";
-    state.textContent = "읽음 완료";
-
-    row.append(date, state);
-    row.addEventListener("click", async () => {
-      document.getElementById("bible-check-date").value = record.id;
+  for (let day = 1; day <= lastDate; day += 1) {
+    const dateKey = localDateKey(new Date(year, month, day));
+    const button = document.createElement("button");
+    button.type = "button"; button.className = "bible-calendar-day";
+    button.textContent = String(day);
+    if (bibleCheckRecordIds.has(dateKey)) {
+      button.classList.add("checked");
+      const check = document.createElement("span"); check.textContent = "✓"; check.setAttribute("aria-hidden", "true"); button.append(check);
+      button.setAttribute("aria-label", dateKey + " 말씀 읽음 완료");
+    }
+    if (dateKey === getTodayDateKey()) button.classList.add("today");
+    if (dateKey > getTodayDateKey()) button.disabled = true;
+    button.addEventListener("click", async () => {
+      document.getElementById("bible-check-date").value = dateKey;
       await loadBibleCheckForDate();
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      document.getElementById("bible-check-status").scrollIntoView({ behavior: "smooth", block: "center" });
     });
+    list.append(button);
+  }
+}
 
-    list.append(row);
-  });
+function changeBibleCalendarMonth(offset) {
+  bibleCalendarDate = new Date(bibleCalendarDate.getFullYear(), bibleCalendarDate.getMonth() + offset, 1);
+  renderBibleCheckHistory(Array.from(bibleCheckRecordIds, (id) => ({ id, data: () => ({ checked: true }) })));
 }
 
 async function loadBibleCheckHistory() {
@@ -690,6 +692,7 @@ async function openBibleCheck() {
 
   const dateInput = document.getElementById("bible-check-date");
   const today = getTodayDateKey();
+  bibleCalendarDate = new Date();
   dateInput.max = today;
 
   if (!isValidBibleCheckDate(dateInput.value)) {
@@ -808,9 +811,14 @@ function getMemoryAssessmentLabel(value) {
 }
 
 function getMemoryVerses() {
-  if (Array.isArray(memoryPassage?.verses)) return memoryPassage.verses;
+  if (Array.isArray(memoryPassage?.verses)) {
+    return memoryPassage.verses.map((verse) => ({
+      ...verse,
+      year: Number(verse.year || 2026)
+    }));
+  }
   if (memoryPassage?.reference && memoryPassage?.content) {
-    return [{ id: "legacy", reference: memoryPassage.reference, content: memoryPassage.content }];
+    return [{ id: "legacy", year: 2026, reference: memoryPassage.reference, content: memoryPassage.content }];
   }
   return [];
 }
@@ -827,6 +835,7 @@ function resetMemoryPassageForm() {
   editingMemoryVerseId = null;
   document.getElementById("memory-passage-reference").value = "";
   document.getElementById("memory-passage-content").value = "";
+  document.getElementById("memory-passage-year").value = String(selectedMemoryYear || new Date().getFullYear());
   document.getElementById("memory-passage-save-button").textContent = "새 암송 말씀 추가";
   document.getElementById("memory-passage-cancel-button").hidden = true;
 }
@@ -838,7 +847,7 @@ function renderMemoryAdminVerseList() {
     const row = document.createElement("div");
     row.className = "memory-admin-verse-row";
     const label = document.createElement("span");
-    label.textContent = verse.reference + (verse.id === memoryPassage?.currentVerseId ? " · 이번 달" : "");
+    label.textContent = verse.year + "년 · " + verse.reference + (verse.id === memoryPassage?.currentVerseId ? " · 이번 달" : "");
     const actions = document.createElement("div");
     actions.className = "compact-actions";
     if (verse.id !== memoryPassage?.currentVerseId) {
@@ -856,7 +865,11 @@ function renderMemoryAdminVerseList() {
 function renderMemoryVerseSelection() {
   const verses = getMemoryVerses();
   const select = document.getElementById("memory-verse-select");
+  const yearSelect = document.getElementById("memory-year-select");
+  const accordion = document.getElementById("memory-verse-accordion");
   select.replaceChildren();
+  yearSelect.replaceChildren();
+  accordion.replaceChildren();
   if (verses.length === 0) {
     const option = document.createElement("option");
     option.textContent = "등록된 암송 말씀이 없습니다";
@@ -876,8 +889,43 @@ function renderMemoryVerseSelection() {
       selectedMemoryVerseId = memoryPassage?.currentVerseId || verses[0].id;
     }
     select.value = selectedMemoryVerseId;
+    const years = [...new Set(verses.map((verse) => verse.year))].sort((a, b) => b - a);
+    if (!years.includes(selectedMemoryYear)) {
+      selectedMemoryYear = getSelectedMemoryVerse()?.year || years[0];
+    }
+    years.forEach((year) => {
+      const option = document.createElement("option");
+      option.value = String(year); option.textContent = year + "년"; yearSelect.append(option);
+    });
+    yearSelect.value = String(selectedMemoryYear);
+    verses.filter((verse) => verse.year === selectedMemoryYear).forEach((verse) => {
+      const details = document.createElement("details");
+      details.className = "memory-verse-room";
+      const summary = document.createElement("summary");
+      summary.textContent = verse.reference + (verse.id === memoryPassage?.currentVerseId ? " · 이번 달" : "");
+      const body = document.createElement("div"); body.className = "memory-verse-room-content";
+      const guide = document.createElement("p"); guide.textContent = verse.id === memoryPassage?.currentVerseId ? "이번 달 암송 말씀입니다." : "지난 말씀을 다시 복습할 수 있습니다.";
+      const button = createPrayerActionButton("이 말씀 연습하기", "primary-button", () => openMemoryVersePractice(verse.id));
+      body.append(guide, button); details.append(summary, body); accordion.append(details);
+    });
   }
   applySelectedMemoryVerse();
+}
+
+function selectMemoryYear() {
+  selectedMemoryYear = Number(document.getElementById("memory-year-select").value);
+  renderMemoryVerseSelection();
+  document.getElementById("memory-passage-heading").textContent = selectedMemoryYear + "년 암송 말씀";
+  document.getElementById("memory-practice-card").hidden = true;
+}
+
+function openMemoryVersePractice(verseId) {
+  selectedMemoryVerseId = verseId;
+  document.getElementById("memory-verse-select").value = verseId;
+  applySelectedMemoryVerse();
+  document.getElementById("memory-practice-card").hidden = false;
+  loadMemoryChecks();
+  document.getElementById("memory-practice-card").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function applySelectedMemoryVerse() {
@@ -1000,6 +1048,9 @@ async function loadMemoryPassage() {
   const verses = getMemoryVerses();
   if (!memoryPassage?.currentVerseId && verses.length) memoryPassage.currentVerseId = verses[0].id;
   selectedMemoryVerseId = memoryPassage?.currentVerseId || verses[0]?.id || null;
+  selectedMemoryYear = getSelectedMemoryVerse()?.year || new Date().getFullYear();
+  document.getElementById("memory-passage-heading").textContent = selectedMemoryYear + "년 암송 말씀";
+  document.getElementById("memory-practice-card").hidden = true;
   const admin = document.getElementById("memory-passage-admin");
   admin.hidden = currentUserProfile?.role !== "admin";
   if (!admin.hidden) {
@@ -1013,7 +1064,8 @@ async function saveMemoryPassage() {
   if (currentUserProfile?.role !== "admin") return;
   const reference = document.getElementById("memory-passage-reference").value.trim();
   const content = document.getElementById("memory-passage-content").value.trim();
-  if (!reference || reference.length > 100 || !content || content.length > 3000) {
+  const year = Number(document.getElementById("memory-passage-year").value);
+  if (year < 2020 || year > 2100 || !reference || reference.length > 100 || !content || content.length > 3000) {
     setMessage("memory-check-message", "말씀 위치와 본문을 확인해주세요.", "error");
     return;
   }
@@ -1026,8 +1078,9 @@ async function saveMemoryPassage() {
       if (!verse) throw new Error("Verse not found");
       verse.reference = reference;
       verse.content = content;
+      verse.year = year;
     } else {
-      verses.push({ id: createMemoryVerseId(), reference, content });
+      verses.push({ id: createMemoryVerseId(), year, reference, content });
     }
     const currentVerseId = memoryPassage?.currentVerseId || verses[0].id;
     await setDoc(doc(db, "memoryPassages", "current"), {
@@ -1049,6 +1102,8 @@ function editMemoryVerse(verseId) {
   const verse = getMemoryVerses().find((item) => item.id === verseId);
   if (!verse) return;
   editingMemoryVerseId = verseId;
+  document.getElementById("memory-passage-admin").open = true;
+  document.getElementById("memory-passage-year").value = String(verse.year || 2026);
   document.getElementById("memory-passage-reference").value = verse.reference;
   document.getElementById("memory-passage-content").value = verse.content;
   document.getElementById("memory-passage-save-button").textContent = "암송 말씀 수정";
@@ -1150,6 +1205,7 @@ async function openMemoryCheck() {
   }
 
   showScreen("memory-screen");
+  document.getElementById("memory-passage-admin").open = false;
   setMessage("memory-check-message", "암송 기록을 불러오는 중입니다.");
 
   try {
@@ -1278,12 +1334,45 @@ function showPrayerTab(tabName) {
 
 function resetPrivatePrayerForm() {
   editingPrivatePrayerId = null;
+  const prayerDateInput = document.getElementById("private-prayer-date");
+  prayerDateInput.max = getTodayDateKey();
+  prayerDateInput.value = getTodayDateKey();
+  initializePrayerTimeSelects();
+  document.getElementById("private-prayer-hours").value = "0";
+  document.getElementById("private-prayer-minutes").value = "10";
   document.getElementById("private-prayer-title").value = "";
   document.getElementById("private-prayer-content").value = "";
   document.getElementById("private-prayer-save-button").textContent =
-    "기도 기록 저장";
+    "기도시간 적립";
   document.getElementById("private-prayer-cancel-button").hidden = true;
   setMessage("private-prayer-message", "");
+}
+
+function initializePrayerTimeSelects() {
+  const hours = document.getElementById("private-prayer-hours");
+  const minutes = document.getElementById("private-prayer-minutes");
+  if (hours.options.length === 0) {
+    for (let value = 0; value <= 12; value += 1) {
+      const option = document.createElement("option");
+      option.value = String(value); option.textContent = value + "시간"; hours.append(option);
+    }
+  }
+  if (minutes.options.length === 0) {
+    for (let value = 0; value < 60; value += 5) {
+      const option = document.createElement("option");
+      option.value = String(value); option.textContent = value + "분"; minutes.append(option);
+    }
+  }
+}
+
+function formatPrayerDuration(totalMinutes) {
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return (hours ? hours + "시간 " : "") + (minutes ? minutes + "분" : (hours ? "" : "0분"));
+}
+
+function formatPrayerBankAmount(amount) {
+  return Number(amount || 0).toLocaleString("ko-KR") + "원";
 }
 
 function renderPrivatePrayers(documents) {
@@ -1307,8 +1396,19 @@ function renderPrivatePrayers(documents) {
     empty.className = "prayer-empty";
     empty.textContent = "아직 기록한 기도가 없습니다.";
     list.append(empty);
+    document.getElementById("private-prayer-total-time").textContent = "0분";
+    document.getElementById("private-prayer-total-amount").textContent = "0원";
     return;
   }
+
+  const totalMinutes = prayers.reduce(
+    (sum, prayer) => sum + Number(prayer.durationMinutes || 0),
+    0
+  );
+  document.getElementById("private-prayer-total-time").textContent =
+    formatPrayerDuration(totalMinutes);
+  document.getElementById("private-prayer-total-amount").textContent =
+    formatPrayerBankAmount(totalMinutes * 10000);
 
   prayers.forEach((prayer) => {
     privatePrayerCache.set(prayer.id, prayer);
@@ -1320,7 +1420,7 @@ function renderPrivatePrayers(documents) {
     heading.className = "prayer-record-heading";
 
     const title = document.createElement("h3");
-    title.textContent = prayer.title;
+    title.textContent = prayer.title || "기도시간 적립";
     heading.append(title);
 
     const status = document.createElement("span");
@@ -1333,12 +1433,27 @@ function renderPrivatePrayers(documents) {
 
     const content = document.createElement("p");
     content.className = "prayer-record-content";
-    content.textContent = prayer.content;
+    content.textContent = prayer.content || "메모 없음";
     card.append(content);
+
+    if (prayer.durationMinutes) {
+      const transaction = document.createElement("div");
+      transaction.className = "prayer-bank-transaction";
+      const duration = document.createElement("strong");
+      duration.textContent = formatPrayerDuration(prayer.durationMinutes);
+      const amount = document.createElement("strong");
+      amount.textContent = "+ " + formatPrayerBankAmount(
+        prayer.amount || prayer.durationMinutes * 10000
+      );
+      transaction.append(duration, amount);
+      card.append(transaction);
+    }
 
     const date = document.createElement("p");
     date.className = "prayer-record-date";
-    date.textContent = formatPrayerDate(prayer.createdAt);
+    date.textContent = prayer.prayerDate
+      ? new Date(prayer.prayerDate + "T00:00:00").toLocaleDateString("ko-KR")
+      : formatPrayerDate(prayer.createdAt);
     card.append(date);
 
     const actions = document.createElement("div");
@@ -1373,17 +1488,22 @@ async function loadPrivatePrayers() {
 }
 
 async function savePrivatePrayer() {
+  const prayerDate = document.getElementById("private-prayer-date").value;
+  const hours = Number(document.getElementById("private-prayer-hours").value);
+  const minutes = Number(document.getElementById("private-prayer-minutes").value);
+  const durationMinutes = hours * 60 + minutes;
+  const amount = durationMinutes * 10000;
   const titleInput = document.getElementById("private-prayer-title");
   const contentInput = document.getElementById("private-prayer-content");
-  const title = titleInput.value.trim();
+  const title = titleInput.value.trim() || "기도시간 적립";
   const prayerContent = contentInput.value.trim();
 
   setMessage("private-prayer-message", "");
 
-  if (!title || !prayerContent) {
+  if (!prayerDate || prayerDate > getTodayDateKey() || durationMinutes < 1 || durationMinutes > 720) {
     setMessage(
       "private-prayer-message",
-      "기도 제목과 내용을 모두 입력해주세요.",
+      "오늘 또는 지난 기도 날짜와 기도 시간을 확인해주세요.",
       "error"
     );
     return;
@@ -1404,7 +1524,7 @@ async function savePrivatePrayer() {
     "private-prayer-save-button",
     true,
     "저장 중...",
-    wasEditing ? "기도 기록 수정" : "기도 기록 저장"
+    wasEditing ? "기도시간 수정" : "기도시간 적립"
   );
 
   try {
@@ -1423,6 +1543,9 @@ async function savePrivatePrayer() {
           editingPrivatePrayerId
         ),
         {
+          prayerDate,
+          durationMinutes,
+          amount,
           title,
           content: prayerContent,
           updatedAt: serverTimestamp()
@@ -1434,6 +1557,9 @@ async function savePrivatePrayer() {
       );
       await setDoc(reference, {
         uid: auth.currentUser.uid,
+        prayerDate,
+        durationMinutes,
+        amount,
         title,
         content: prayerContent,
         status: "praying",
@@ -1447,7 +1573,7 @@ async function savePrivatePrayer() {
     await loadPrivatePrayers();
     setMessage(
       "private-prayer-message",
-      wasEditing ? "기도 기록을 수정했습니다." : "기도를 기록했습니다.",
+      wasEditing ? "기도시간을 수정했습니다." : formatPrayerBankAmount(amount) + "을 기도통장에 적립했습니다.",
       "success"
     );
   } catch {
@@ -1460,8 +1586,8 @@ async function savePrivatePrayer() {
     const button = document.getElementById("private-prayer-save-button");
     button.disabled = false;
     button.textContent = editingPrivatePrayerId
-      ? "기도 기록 수정"
-      : "기도 기록 저장";
+      ? "기도시간 수정"
+      : "기도시간 적립";
   }
 }
 
@@ -1472,10 +1598,18 @@ function editPrivatePrayer(prayerId) {
   }
 
   editingPrivatePrayerId = prayerId;
+  initializePrayerTimeSelects();
+  const durationMinutes = Number(prayer.durationMinutes || 0);
+  document.getElementById("private-prayer-date").value =
+    prayer.prayerDate || getTodayDateKey();
+  document.getElementById("private-prayer-hours").value =
+    String(Math.floor(durationMinutes / 60));
+  document.getElementById("private-prayer-minutes").value =
+    String(durationMinutes % 60);
   document.getElementById("private-prayer-title").value = prayer.title;
   document.getElementById("private-prayer-content").value = prayer.content;
   document.getElementById("private-prayer-save-button").textContent =
-    "기도 기록 수정";
+    "기도시간 수정";
   document.getElementById("private-prayer-cancel-button").hidden = false;
   setMessage("private-prayer-message", "수정할 내용을 확인해주세요.");
   document.getElementById("private-prayer-title").focus();
@@ -2083,6 +2217,7 @@ async function openPrayer() {
 
   showScreen("prayer-screen");
   showPrayerTab("private");
+  if (!editingPrivatePrayerId) resetPrivatePrayerForm();
   setMessage("private-prayer-message", "기도 기록을 불러오는 중입니다.");
 
   try {
@@ -3172,6 +3307,7 @@ function resetWordRoomForm() {
     "모임방 만들기";
   document.getElementById("word-room-cancel-button").hidden = true;
   setMessage("word-room-message", "");
+  document.getElementById("word-room-create-section").open = false;
 }
 
 function getWordRoomType(room) {
@@ -3385,6 +3521,7 @@ function editWordRoom(roomId) {
   }
 
   editingWordRoomId = roomId;
+  document.getElementById("word-room-create-section").open = true;
   document.getElementById("word-room-name").value = room.name;
   document.getElementById("word-room-description").value =
     room.description || "";
@@ -3528,6 +3665,7 @@ async function inviteWordRoomMember() {
   try {
     await batch.commit();
     await refreshCurrentWordRoom();
+    document.getElementById("word-room-invite-section").open = false;
     setMessage("word-room-detail-message", person.name + "님을 초대했습니다.", "success");
   } catch { setMessage("word-room-detail-message", "회원을 초대하지 못했습니다.", "error"); }
 }
@@ -3600,7 +3738,7 @@ function resetWordRoomPlanForm() {
 function applyWordRoomTypeCopy(room) {
   const isPrayer = getWordRoomType(room) === "prayer";
   document.getElementById("word-room-detail-heading").textContent = getWordRoomTypeLabel(room) + " 안내";
-  document.getElementById("word-room-plan-form-heading").textContent = isPrayer ? "기도 계획 설정" : "말씀 계획 설정";
+  document.getElementById("word-room-plan-form-heading").textContent = isPrayer ? "＋ 기도 계획 설정" : "＋ 말씀 계획 설정";
   document.getElementById("word-room-plan-form-description").textContent = isPrayer
     ? "날짜별 기도 제목이나 모임 내용을 정해주세요."
     : "날짜별로 함께 읽을 말씀을 정해주세요.";
@@ -3835,6 +3973,8 @@ function editWordRoomPlan(planId) {
   document.getElementById("word-room-plan-note").value = plan.note || "";
   document.getElementById("word-room-plan-save-button").textContent = getWordRoomType(room) === "prayer" ? "기도 계획 수정" : "말씀 계획 수정";
   document.getElementById("word-room-plan-cancel-button").hidden = false;
+  document.getElementById("word-room-plan-form-section").open = true;
+  document.getElementById("word-room-plan-form-section").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 async function deleteWordRoomPlan(planId) {
@@ -4690,11 +4830,14 @@ window.logout = logout;
 window.openAdminMembers = openAdminMembers;
 window.openBibleCheck = openBibleCheck;
 window.toggleBibleCheck = toggleBibleCheck;
+window.changeBibleCalendarMonth = changeBibleCalendarMonth;
 window.openMemoryCheck = openMemoryCheck;
 window.toggleMemoryCheck = toggleMemoryCheck;
 window.saveMemoryPassage = saveMemoryPassage;
 window.resetMemoryPassageForm = resetMemoryPassageForm;
 window.selectMemoryVerse = selectMemoryVerse;
+window.selectMemoryYear = selectMemoryYear;
+window.openMemoryVersePractice = openMemoryVersePractice;
 window.resetMemoryPractice = resetMemoryPractice;
 window.undoMemoryChunk = undoMemoryChunk;
 window.checkMemoryPractice = checkMemoryPractice;

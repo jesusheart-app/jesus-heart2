@@ -586,13 +586,16 @@
 
           <h2>나의 말씀체크 기록</h2>
 
-          <p class="bible-check-history-guide">
-            기록을 선택하면 지난 날짜의 체크를 확인하거나 삭제할 수 있습니다.
-          </p>
+          <div class="bible-calendar-header">
+            <button class="calendar-nav-button" type="button" onclick="changeBibleCalendarMonth(-1)" aria-label="이전 달">‹</button>
+            <strong id="bible-calendar-title"></strong>
+            <button class="calendar-nav-button" type="button" onclick="changeBibleCalendarMonth(1)" aria-label="다음 달">›</button>
+          </div>
+          <div class="bible-calendar-weekdays" aria-hidden="true"><span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span></div>
 
           <div
             id="bible-check-history"
-            class="bible-check-history"
+            class="bible-check-history bible-calendar"
           ></div>
 
         </div>
@@ -661,34 +664,48 @@
 
           <div class="page-card">
 
-            <h2>나의 기도 기록</h2>
+            <h2>기도시간 기록</h2>
 
             <p>
-              이곳의 기록은 본인만 볼 수 있습니다.
+              기도한 시간을 직접 기록하면 1분당 10,000원으로 적립됩니다. 이 기록은 본인만 볼 수 있습니다.
             </p>
 
             <div class="prayer-form">
 
+              <label for="private-prayer-date">기도 날짜</label>
+              <input id="private-prayer-date" type="date">
+
+              <div class="prayer-time-fields">
+                <div>
+                  <label for="private-prayer-hours">시간</label>
+                  <select id="private-prayer-hours"></select>
+                </div>
+                <div>
+                  <label for="private-prayer-minutes">분</label>
+                  <select id="private-prayer-minutes"></select>
+                </div>
+              </div>
+
               <label for="private-prayer-title">
-                기도 제목
+                기도 제목 (선택)
               </label>
 
               <input
                 id="private-prayer-title"
                 type="text"
                 maxlength="80"
-                placeholder="기도 제목을 입력하세요"
+                placeholder="비워두면 ‘기도시간 적립’으로 저장됩니다"
               >
 
               <label for="private-prayer-content">
-                기도 내용
+                기도 내용 또는 메모 (선택)
               </label>
 
               <textarea
                 id="private-prayer-content"
                 maxlength="2000"
                 rows="6"
-                placeholder="기도 내용을 기록하세요"
+                placeholder="기억하고 싶은 기도 내용을 적어주세요"
               ></textarea>
 
               <button
@@ -697,7 +714,7 @@
                 type="button"
                 onclick="savePrivatePrayer()"
               >
-                기도 기록 저장
+                기도시간 적립
               </button>
 
               <button
@@ -724,6 +741,11 @@
           <div class="page-card">
 
             <h2>나의 기도통장</h2>
+
+            <div class="prayer-bank-summary">
+              <div><span>누적 기도시간</span><strong id="private-prayer-total-time">0분</strong></div>
+              <div><span>기도통장 적립금</span><strong id="private-prayer-total-amount">0원</strong></div>
+            </div>
 
             <div
               id="private-prayer-list"
@@ -1151,13 +1173,16 @@
             요한일서 4장 15절~21절
           </p>
 
-          <label class="memory-verse-select-label" for="memory-verse-select">연습할 말씀</label>
-          <select id="memory-verse-select" class="memory-verse-select" onchange="selectMemoryVerse()"></select>
+          <select id="memory-verse-select" class="memory-verse-select" onchange="selectMemoryVerse()" hidden></select>
 
           <div id="memory-passage-text" class="memory-passage-text"></div>
 
-          <div id="memory-passage-admin" class="memory-passage-admin" hidden>
+          <details id="memory-passage-admin" class="memory-passage-admin collapsible-card" hidden>
+            <summary>＋ 암송 말씀 등록·관리</summary>
+            <div class="collapsible-content">
             <p>암송 말씀을 한 절씩 등록하고 이번 달 말씀을 선택할 수 있습니다.</p>
+            <label for="memory-passage-year">연도</label>
+            <input id="memory-passage-year" type="number" min="2020" max="2100" inputmode="numeric">
             <label for="memory-passage-reference">말씀 위치</label>
             <input id="memory-passage-reference" type="text" maxlength="100" placeholder="예: 요한일서 4장 15절~21절">
             <label for="memory-passage-content">말씀 본문</label>
@@ -1165,12 +1190,21 @@
             <button id="memory-passage-save-button" class="secondary-button" type="button" onclick="saveMemoryPassage()">새 암송 말씀 추가</button>
             <button id="memory-passage-cancel-button" class="text-button" type="button" onclick="resetMemoryPassageForm()" hidden>수정 취소</button>
             <div id="memory-admin-verse-list" class="memory-admin-verse-list"></div>
-          </div>
+            </div>
+          </details>
 
         </div>
 
 
         <div class="page-card">
+
+          <label class="memory-verse-select-label" for="memory-year-select">암송 연도</label>
+          <select id="memory-year-select" class="memory-verse-select" onchange="selectMemoryYear()"></select>
+          <div id="memory-verse-accordion" class="memory-verse-accordion"></div>
+
+        </div>
+
+        <div id="memory-practice-card" class="page-card" hidden>
 
           <h2>암송 말씀 스스로 확인하기</h2>
 
@@ -1262,9 +1296,10 @@
 
       <main class="page-content word-room-content">
 
-        <div class="page-card">
+        <details id="word-room-create-section" class="page-card collapsible-card">
 
-          <h2>새 모임방 만들기</h2>
+          <summary>＋ 새 모임방 만들기</summary>
+          <div class="collapsible-content">
 
           <p>
             말씀을 읽거나 함께 기도할 소그룹 공간을 만들어보세요.
@@ -1323,7 +1358,9 @@
 
           </div>
 
-        </div>
+          </div>
+
+        </details>
 
 
         <div class="page-card">
@@ -1382,17 +1419,20 @@
         </div>
 
 
-        <div id="word-room-invite-section" class="page-card" hidden>
-          <h2>회원 초대</h2>
+        <details id="word-room-invite-section" class="page-card collapsible-card" hidden>
+          <summary>＋ 회원 초대</summary>
+          <div class="collapsible-content">
           <p>승인된 회원을 이 모임방에 초대할 수 있습니다.</p>
           <div class="word-room-invite-form">
             <select id="word-room-invite-member" aria-label="초대할 회원"></select>
             <button id="word-room-invite-button" class="primary-button" type="button" onclick="inviteWordRoomMember()">회원 초대</button>
           </div>
-        </div>
+          </div>
+        </details>
 
-        <div id="word-room-plan-form-section" class="page-card" hidden>
-          <h2 id="word-room-plan-form-heading">말씀 계획 설정</h2>
+        <details id="word-room-plan-form-section" class="page-card collapsible-card" hidden>
+          <summary id="word-room-plan-form-heading">＋ 공동 계획 설정</summary>
+          <div class="collapsible-content">
           <p id="word-room-plan-form-description">날짜별로 함께 읽을 말씀을 정해주세요.</p>
           <div class="word-room-plan-form">
             <label id="word-room-plan-date-label" for="word-room-plan-date">읽는 날짜</label>
@@ -1405,7 +1445,8 @@
             <button id="word-room-plan-cancel-button" class="secondary-button" type="button" onclick="resetWordRoomPlanForm()" hidden>수정 취소</button>
             <div id="word-room-plan-message" class="start-message word-room-message" aria-live="polite"></div>
           </div>
-        </div>
+          </div>
+        </details>
 
         <div id="word-room-prayer-topic-form-section" class="page-card" hidden>
           <h2>나의 기도제목 나누기</h2>
