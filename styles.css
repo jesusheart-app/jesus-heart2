@@ -542,23 +542,26 @@
 
     .prayer-reactions {
       display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
+      flex-wrap: nowrap;
+      gap: 4px;
       margin-top: 16px;
       padding-top: 14px;
       border-top: 1px solid #E8E1D8;
     }
 
     .prayer-reaction-button {
-      min-height: 42px;
-      padding: 9px 12px;
+      min-width: 0;
+      min-height: 38px;
+      flex: 1 1 0;
+      padding: 7px 6px;
       border: 1px solid #DDD3C7;
       border-radius: 999px;
       background: #FCFBF8;
       color: #51483F;
-      font-size: 13px;
+      font-size: 11px;
       font-weight: 700;
       cursor: pointer;
+      white-space: nowrap;
     }
 
     .prayer-reaction-button.active {
@@ -666,6 +669,60 @@
       margin: 0;
     }
 
+    .prayer-time-fields {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .prayer-time-field {
+      display: grid;
+      gap: 7px;
+    }
+
+    .prayer-time-field select {
+      width: 100%;
+      min-height: 48px;
+      padding: 10px 12px;
+      border: 1px solid #DDD3C7;
+      border-radius: 14px;
+      background: #FCFBF8;
+      color: #443C34;
+      font: inherit;
+    }
+
+    .prayer-bank-summary {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin: 16px 0;
+    }
+
+    .prayer-bank-summary > div {
+      padding: 14px;
+      border: 1px solid #D7C6AC;
+      border-radius: 14px;
+      background: #FFF9EF;
+    }
+
+    .prayer-bank-summary span { display: block; color: #81786D; font-size: 12px; font-weight: 700; }
+    .prayer-bank-summary strong { display: block; margin-top: 5px; color: #704F34; font-size: 18px; }
+    .prayer-bank-transaction { display: flex; justify-content: space-between; gap: 10px; margin-top: 10px; color: #6D5944; font-size: 13px; font-weight: 750; }
+
+    .collapsible-card > summary {
+      padding: 18px 20px;
+      color: #443C34;
+      font-size: 17px;
+      font-weight: 800;
+      cursor: pointer;
+      list-style: none;
+    }
+
+    .page-card.collapsible-card { padding: 0; }
+    .collapsible-card > summary::-webkit-details-marker { display: none; }
+    .collapsible-card[open] > summary { border-bottom: 1px solid #E8E1D8; }
+    .collapsible-card > .collapsible-content { padding: 18px 20px 20px; }
+
     /* ========================================
        암송 체크 데이터 뼈대
     ======================================== */
@@ -683,12 +740,13 @@
     }
 
     .memory-passage-admin {
-      display: grid;
-      gap: 9px;
+      display: block;
       margin-top: 20px;
       padding-top: 18px;
       border-top: 1px solid #E1D9CE;
     }
+
+    .memory-passage-admin .collapsible-content { display: grid; gap: 9px; }
 
     .memory-passage-admin[hidden] { display: none; }
     .memory-passage-admin label { color: #443C34; font-weight: 700; }
@@ -748,6 +806,12 @@
     .memory-assessment p { margin: 0 !important; font-weight: 700; }
     .memory-assessment button { min-height: 48px; padding: 10px; border: 1px solid #CFC3B4; border-radius: 12px; background: white; color: #443C34; font: inherit; font-weight: 700; }
 
+    .memory-verse-accordion { display: grid; gap: 8px; margin-top: 14px; }
+    .memory-verse-room { border: 1px solid #DED5C9; border-radius: 14px; background: #FCFBF8; overflow: hidden; }
+    .memory-verse-room summary { padding: 15px; color: #443C34; font-weight: 750; cursor: pointer; }
+    .memory-verse-room-content { padding: 0 15px 15px; }
+    .memory-verse-room-content p { margin-top: 0 !important; }
+
     .memory-check-status {
       min-height: 28px;
       margin: 18px 0 !important;
@@ -806,6 +870,8 @@
 
     .community-bible-card {
       background: #F0E8D9;
+      border: 2px solid #9E8568;
+      box-shadow: 0 6px 22px rgba(90, 72, 54, 0.12);
     }
 
     .community-bible-message {
@@ -866,7 +932,7 @@
 
     .bible-check-history {
       display: grid;
-      gap: 10px;
+      gap: 6px;
     }
 
     .bible-check-history-row {
@@ -900,6 +966,17 @@
       color: #71685F;
       text-align: center;
     }
+
+    .bible-check-delete-button { display: block; margin-left: auto !important; }
+    .bible-calendar-header { display: grid; grid-template-columns: 42px 1fr 42px; align-items: center; gap: 8px; margin: 14px 0; text-align: center; }
+    .calendar-nav-button { width: 42px; height: 42px; border: 1px solid #D8CFC2; border-radius: 12px; background: white; color: #62594F; font-size: 24px; }
+    .bible-calendar-weekdays, .bible-calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+    .bible-calendar-weekdays { margin-bottom: 6px; color: #81786D; font-size: 12px; text-align: center; }
+    .bible-calendar-day { position: relative; aspect-ratio: 1; min-width: 0; min-height: 42px; padding: 4px; border: 1px solid #E5DDD2; border-radius: 10px; background: #FCFBF8; color: #62594F; font: inherit; }
+    .bible-calendar-day.checked { border-color: #6E8C72; background: #E7F0E5; color: #36513B; font-weight: 800; }
+    .bible-calendar-day.checked span { display: block; font-size: 12px; line-height: 1; }
+    .bible-calendar-day.today { box-shadow: inset 0 0 0 2px #A68563; }
+    .bible-calendar-day:disabled { opacity: 0.35; cursor: default; }
 
     /* ========================================
        관리자 회원관리 뼈대
@@ -1484,8 +1561,8 @@
     .word-room-plan-comments textarea { width: 100%; padding: 12px 14px; border: 1px solid #DDD3C7; border-radius: 14px; background: white; font: inherit; }
     .word-room-comment { padding: 13px; border-radius: 12px; background: #F8F5EF; }
     .word-room-comment p { margin: 7px 0 !important; white-space: pre-wrap; }
-    .word-room-comment-reactions { display: flex; flex-wrap: wrap; gap: 6px; }
-    .word-room-reaction-button { min-height: 38px; margin: 0; padding: 7px 10px; font-size: 12px; }
+    .word-room-comment-reactions { display: flex; flex-wrap: nowrap; gap: 6px; }
+    .word-room-reaction-button { flex: 1; min-width: 0; min-height: 36px; margin: 0; padding: 6px 7px; font-size: 11px; white-space: nowrap; }
     .word-room-reaction-button.active { border-color: #A68563; background: #F0E5D8; }
 
     /* ========================================
@@ -1726,6 +1803,9 @@
       .memory-chunk-button,
       .memory-selected-chunk { width: 100%; justify-content: flex-start; text-align: left; }
       .word-room-member-actions { grid-template-columns: 1fr; }
+      .prayer-reaction-button,
+      .word-room-reaction-button { padding-left: 4px; padding-right: 4px; font-size: 10px; }
+      .bible-calendar-day { min-height: 42px; }
       .mypage-profile-list div { grid-template-columns: 78px 1fr; }
       .bottom-nav-inner { padding-left: 8px; padding-right: 8px; }
     }
