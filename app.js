@@ -4525,7 +4525,7 @@ async function refreshNotificationSettingsUI() {
   const statusText = Notification.permission === "denied"
     ? "휴대폰 설정에서 이 앱의 알림을 허용해 주세요."
     : enabled
-      ? "매일 말씀 알림을 받고 있습니다."
+      ? "예수마음 알림을 받고 있습니다."
       : "현재 알림을 받지 않고 있습니다.";
   setNotificationUI(enabled, statusText);
 }
@@ -4640,16 +4640,16 @@ async function toggleDailyNotifications() {
     if (currentlyEnabled) {
       await disableDailyNotifications();
       setNotificationUI(false, "현재 알림을 받지 않고 있습니다.");
-      setMessage("mypage-notification-message", "말씀 알림을 껐습니다.", "success");
+      setMessage("mypage-notification-message", "예수마음 알림을 껐습니다.", "success");
     } else {
       await enableDailyNotifications();
-      setNotificationUI(true, "매일 말씀 알림을 받고 있습니다.");
-      setMessage("mypage-notification-message", "말씀 알림을 켰습니다.", "success");
+      setNotificationUI(true, "예수마음 알림을 받고 있습니다.");
+      setMessage("mypage-notification-message", "예수마음 알림을 켰습니다.", "success");
     }
   } catch (error) {
     console.error("Notification registration failed", error);
     const statusText = Notification.permission === "granted"
-      ? "휴대폰 알림 권한은 허용되어 있습니다."
+      ? "휴대폰 권한은 허용됐지만 앱 알림 등록은 아직 완료되지 않았습니다."
       : "현재 알림을 받지 않고 있습니다.";
     setNotificationUI(false, statusText);
     setMessage(
