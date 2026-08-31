@@ -1052,8 +1052,10 @@ async function loadMemoryPassage() {
   document.getElementById("memory-passage-heading").textContent = selectedMemoryYear + "년 암송 말씀";
   document.getElementById("memory-practice-card").hidden = true;
   const admin = document.getElementById("memory-passage-admin");
-  admin.hidden = currentUserProfile?.role !== "admin";
-  if (!admin.hidden) {
+  const canManageMemory = currentUserProfile?.role === "admin";
+  document.getElementById("memory-admin-open-button").hidden = !canManageMemory;
+  closeManagementPanel("memory-passage-admin");
+  if (canManageMemory) {
     resetMemoryPassageForm();
     renderMemoryAdminVerseList();
   }
@@ -1102,7 +1104,7 @@ function editMemoryVerse(verseId) {
   const verse = getMemoryVerses().find((item) => item.id === verseId);
   if (!verse) return;
   editingMemoryVerseId = verseId;
-  document.getElementById("memory-passage-admin").open = true;
+  openManagementPanel("memory-passage-admin");
   document.getElementById("memory-passage-year").value = String(verse.year || 2026);
   document.getElementById("memory-passage-reference").value = verse.reference;
   document.getElementById("memory-passage-content").value = verse.content;
@@ -1205,7 +1207,7 @@ async function openMemoryCheck() {
   }
 
   showScreen("memory-screen");
-  document.getElementById("memory-passage-admin").open = false;
+  closeManagementPanel("memory-passage-admin");
   setMessage("memory-check-message", "암송 기록을 불러오는 중입니다.");
 
   try {
@@ -1315,6 +1317,39 @@ function createPrayerActionButton(label, className, onClick) {
   button.textContent = label;
   button.addEventListener("click", onClick);
   return button;
+}
+
+let managementPanelReturnFocus = null;
+
+function openManagementPanel(panelId) {
+  const panel = document.getElementById(panelId);
+  if (!panel) return;
+  managementPanelReturnFocus = document.activeElement;
+  panel.hidden = false;
+  document.body.classList.add("management-panel-open");
+  panel.querySelector(".management-close-button")?.focus();
+}
+
+function closeManagementPanel(panelId) {
+  const panel = document.getElementById(panelId);
+  if (!panel) return;
+  const wasOpen = !panel.hidden;
+  panel.hidden = true;
+  if (!document.querySelector(".management-overlay:not([hidden])")) {
+    document.body.classList.remove("management-panel-open");
+  }
+  if (wasOpen && managementPanelReturnFocus?.isConnected) managementPanelReturnFocus.focus();
+  managementPanelReturnFocus = null;
+}
+
+function openWordRoomCreatePanel() {
+  resetWordRoomForm({ closePanel: false });
+  openManagementPanel("word-room-create-section");
+}
+
+function closeWordRoomCreatePanel() {
+  resetWordRoomForm({ closePanel: false });
+  closeManagementPanel("word-room-create-section");
 }
 
 function showPrayerTab(tabName) {
@@ -1735,6 +1770,16 @@ async function toggleCommunityPrayerReaction(prayer, reactionType) {
 }
 
 async function renderCommunityPrayerReactions(prayer, container) {
+  const isAuthor = prayer.uid === auth.currentUser?.uid;
+  container.replaceChildren();
+  if (isAuthor) {
+    const guide = document.createElement("p");
+    guide.className = "prayer-reaction-guide";
+    guide.textContent = "다른 회원들이 이 기도제목에 함께 마음을 모을 수 있어요.";
+    container.append(guide);
+    return;
+  }
+
   container.textContent = "반응을 불러오는 중입니다.";
 
   try {
@@ -1750,8 +1795,6 @@ async function renderCommunityPrayerReactions(prayer, container) {
     const mine = reactionSnapshot.exists()
       ? reactionSnapshot.data()
       : { prayer: false, heart: false, amen: false };
-    const isAuthor = prayer.uid === auth.currentUser?.uid;
-
     container.replaceChildren();
 
     communityPrayerReactionTypes.forEach((reactionType) => {
@@ -1761,17 +1804,13 @@ async function renderCommunityPrayerReactions(prayer, container) {
       button.type = "button";
       button.className = "prayer-reaction-button";
       button.textContent = emoji + " " + label + (count ? " " + count : "");
-      button.disabled = isAuthor;
       button.setAttribute("aria-pressed", mine[key] === true ? "true" : "false");
 
       if (mine[key] === true) {
         button.classList.add("active");
       }
 
-      if (isAuthor) {
-        button.title = "작성자는 자신의 기도제목에 반응할 수 없습니다.";
-      } else {
-        button.addEventListener("click", async () => {
+      button.addEventListener("click", async () => {
           button.disabled = true;
           try {
             await toggleCommunityPrayerReaction(prayer, reactionType);
@@ -1784,19 +1823,11 @@ async function renderCommunityPrayerReactions(prayer, container) {
               "error"
             );
           }
-        });
-      }
+      });
 
       container.append(button);
     });
 
-    if (isAuthor) {
-      const guide = document.createElement("p");
-      guide.className = "prayer-reaction-guide";
-      guide.textContent =
-        "다른 회원들이 이 기도제목에 함께 마음을 모을 수 있어요.";
-      container.append(guide);
-    }
   } catch {
     container.textContent = "반응을 불러오지 못했습니다.";
   }
@@ -2792,6 +2823,16 @@ async function renderCommunityGratitudeReactions(
   gratitude,
   container
 ) {
+  const isAuthor = gratitude.uid === auth.currentUser?.uid;
+  container.replaceChildren();
+  if (isAuthor) {
+    const guide = document.createElement("p");
+    guide.className = "prayer-reaction-guide";
+    guide.textContent = "다른 회원들이 이 감사에 함께 마음을 보탤 수 있어요.";
+    container.append(guide);
+    return;
+  }
+
   container.textContent = "반응을 불러오는 중입니다.";
 
   try {
@@ -2807,8 +2848,6 @@ async function renderCommunityGratitudeReactions(
     const mine = reactionSnapshot.exists()
       ? reactionSnapshot.data()
       : { joy: false, thanks: false, grace: false };
-    const isAuthor = gratitude.uid === auth.currentUser?.uid;
-
     container.replaceChildren();
 
     communityGratitudeReactionTypes.forEach((reactionType) => {
@@ -2818,17 +2857,13 @@ async function renderCommunityGratitudeReactions(
       button.type = "button";
       button.className = "prayer-reaction-button";
       button.textContent = emoji + " " + label + (count ? " " + count : "");
-      button.disabled = isAuthor;
       button.setAttribute("aria-pressed", mine[key] === true ? "true" : "false");
 
       if (mine[key] === true) {
         button.classList.add("active");
       }
 
-      if (isAuthor) {
-        button.title = "작성자는 자신의 감사나눔에 반응할 수 없습니다.";
-      } else {
-        button.addEventListener("click", async () => {
+      button.addEventListener("click", async () => {
           button.disabled = true;
           try {
             await toggleCommunityGratitudeReaction(
@@ -2844,19 +2879,11 @@ async function renderCommunityGratitudeReactions(
               "error"
             );
           }
-        });
-      }
+      });
 
       container.append(button);
     });
 
-    if (isAuthor) {
-      const guide = document.createElement("p");
-      guide.className = "prayer-reaction-guide";
-      guide.textContent =
-        "다른 회원들이 이 감사에 함께 마음을 보탤 수 있어요.";
-      container.append(guide);
-    }
   } catch {
     container.textContent = "반응을 불러오지 못했습니다.";
   }
@@ -3297,7 +3324,7 @@ async function openGratitude() {
   }
 }
 
-function resetWordRoomForm() {
+function resetWordRoomForm(options = {}) {
   editingWordRoomId = null;
   document.getElementById("word-room-name").value = "";
   document.getElementById("word-room-description").value = "";
@@ -3307,7 +3334,7 @@ function resetWordRoomForm() {
     "모임방 만들기";
   document.getElementById("word-room-cancel-button").hidden = true;
   setMessage("word-room-message", "");
-  document.getElementById("word-room-create-section").open = false;
+  if (options.closePanel !== false) closeManagementPanel("word-room-create-section");
 }
 
 function getWordRoomType(room) {
@@ -3521,7 +3548,7 @@ function editWordRoom(roomId) {
   }
 
   editingWordRoomId = roomId;
-  document.getElementById("word-room-create-section").open = true;
+  openManagementPanel("word-room-create-section");
   document.getElementById("word-room-name").value = room.name;
   document.getElementById("word-room-description").value =
     room.description || "";
@@ -3532,7 +3559,6 @@ function editWordRoom(roomId) {
   document.getElementById("word-room-cancel-button").hidden = false;
   setMessage("word-room-message", "수정할 방 정보를 확인해주세요.");
   document.getElementById("word-room-name").focus();
-  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 async function deleteWordRoom(roomId) {
@@ -3628,8 +3654,10 @@ async function refreshCurrentWordRoom() {
   renderWordRoomMembers(room, members);
 
   const inviteSection = document.getElementById("word-room-invite-section");
-  inviteSection.hidden = room.leaderUid !== auth.currentUser.uid;
-  if (!inviteSection.hidden) {
+  const isLeader = room.leaderUid === auth.currentUser.uid;
+  document.getElementById("word-room-management-buttons").hidden = !isLeader;
+  inviteSection.hidden = true;
+  if (isLeader) {
     const directory = await getDocs(collection(db, "memberDirectory"));
     const candidates = directory.docs.map((item) => item.data())
       .filter((member) => !room.memberUids.includes(member.uid))
@@ -3665,7 +3693,7 @@ async function inviteWordRoomMember() {
   try {
     await batch.commit();
     await refreshCurrentWordRoom();
-    document.getElementById("word-room-invite-section").open = false;
+    closeManagementPanel("word-room-invite-section");
     setMessage("word-room-detail-message", person.name + "님을 초대했습니다.", "success");
   } catch { setMessage("word-room-detail-message", "회원을 초대하지 못했습니다.", "error"); }
 }
@@ -3738,7 +3766,8 @@ function resetWordRoomPlanForm() {
 function applyWordRoomTypeCopy(room) {
   const isPrayer = getWordRoomType(room) === "prayer";
   document.getElementById("word-room-detail-heading").textContent = getWordRoomTypeLabel(room) + " 안내";
-  document.getElementById("word-room-plan-form-heading").textContent = isPrayer ? "＋ 기도 계획 설정" : "＋ 말씀 계획 설정";
+  document.getElementById("word-room-plan-form-heading").textContent = isPrayer ? "기도 계획 설정" : "말씀 계획 설정";
+  document.getElementById("word-room-plan-open-button").textContent = isPrayer ? "기도 계획 설정" : "말씀 계획 설정";
   document.getElementById("word-room-plan-form-description").textContent = isPrayer
     ? "날짜별 기도 제목이나 모임 내용을 정해주세요."
     : "날짜별로 함께 읽을 말씀을 정해주세요.";
@@ -3919,8 +3948,7 @@ async function loadWordRoomPlans(room) {
     ...planDocument.data()
   }));
   renderWordRoomPlans(wordRoomPlans, room);
-  document.getElementById("word-room-plan-form-section").hidden =
-    room.leaderUid !== auth.currentUser.uid;
+  document.getElementById("word-room-plan-form-section").hidden = true;
 }
 
 function toggleWordRoomPlans() {
@@ -3973,8 +4001,7 @@ function editWordRoomPlan(planId) {
   document.getElementById("word-room-plan-note").value = plan.note || "";
   document.getElementById("word-room-plan-save-button").textContent = getWordRoomType(room) === "prayer" ? "기도 계획 수정" : "말씀 계획 수정";
   document.getElementById("word-room-plan-cancel-button").hidden = false;
-  document.getElementById("word-room-plan-form-section").open = true;
-  document.getElementById("word-room-plan-form-section").scrollIntoView({ behavior: "smooth", block: "start" });
+  openManagementPanel("word-room-plan-form-section");
 }
 
 async function deleteWordRoomPlan(planId) {
@@ -4822,6 +4849,12 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape") return;
+  const openPanel = document.querySelector(".management-overlay:not([hidden])");
+  if (openPanel) closeManagementPanel(openPanel.id);
+});
+
 window.showScreen = showScreen;
 window.goBackOrHome = goBackOrHome;
 window.login = login;
@@ -4830,6 +4863,10 @@ window.logout = logout;
 window.openAdminMembers = openAdminMembers;
 window.openBibleCheck = openBibleCheck;
 window.toggleBibleCheck = toggleBibleCheck;
+window.openManagementPanel = openManagementPanel;
+window.closeManagementPanel = closeManagementPanel;
+window.openWordRoomCreatePanel = openWordRoomCreatePanel;
+window.closeWordRoomCreatePanel = closeWordRoomCreatePanel;
 window.changeBibleCalendarMonth = changeBibleCalendarMonth;
 window.openMemoryCheck = openMemoryCheck;
 window.toggleMemoryCheck = toggleMemoryCheck;
