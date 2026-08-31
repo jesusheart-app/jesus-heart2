@@ -4541,15 +4541,28 @@ async function saveNotificationPreference(enabled) {
 
 async function enableDailyNotifications() {
   if (!appSettings.firebaseWebPushPublicKey) throw new Error("missing-vapid-key");
-  if (!(await prepareMessaging())) throw new Error("unsupported-messaging");
+  let messagingReady = false;
+  try {
+    messagingReady = await prepareMessaging();
+  } catch (error) {
+    error.notificationStage = "service-worker";
+    throw error;
+  }
+  if (!messagingReady) throw new Error("unsupported-messaging");
 
   const permission = await Notification.requestPermission();
   if (permission !== "granted") throw new Error("permission-denied");
 
-  const token = await getToken(messaging, {
-    vapidKey: appSettings.firebaseWebPushPublicKey,
-    serviceWorkerRegistration: messagingServiceWorker
-  });
+  let token;
+  try {
+    token = await getToken(messaging, {
+      vapidKey: appSettings.firebaseWebPushPublicKey,
+      serviceWorkerRegistration: messagingServiceWorker
+    });
+  } catch (error) {
+    error.notificationStage = "token";
+    throw error;
+  }
   if (!token) throw new Error("missing-token");
 
   const deviceReference = doc(db, "notificationDevices", await sha256(token));
@@ -4561,9 +4574,44 @@ async function enableDailyNotifications() {
     updatedAt: serverTimestamp()
   };
   if (!existingDevice.exists()) deviceData.createdAt = serverTimestamp();
-  await setDoc(deviceReference, deviceData, { merge: true });
-  await saveNotificationPreference(true);
+  try {
+    await setDoc(deviceReference, deviceData, { merge: true });
+  } catch (error) {
+    error.notificationStage = "firestore";
+    throw error;
+  }
+  try {
+    await saveNotificationPreference(true);
+  } catch (error) {
+    error.notificationStage = "settings";
+    throw error;
+  }
   currentNotificationToken = token;
+}
+
+function getNotificationErrorMessage(error) {
+  if (error?.message === "missing-vapid-key") {
+    return "관리자가 알림 설정을 마무리한 뒤 이용할 수 있습니다.";
+  }
+  if (error?.message === "permission-denied") {
+    return "알림이 차단되었습니다. 휴대폰 설정에서 알림을 허용해 주세요.";
+  }
+  if (error?.message === "unsupported-messaging") {
+    return "이 브라우저에서는 웹 알림을 지원하지 않습니다.";
+  }
+  if (error?.notificationStage === "service-worker") {
+    return "알림 준비 파일을 불러오지 못했습니다. 앱을 완전히 닫았다가 다시 실행해 주세요.";
+  }
+  if (error?.notificationStage === "token") {
+    return `Firebase 기기 등록에 실패했습니다. (${error.code || "token-error"})`;
+  }
+  if (error?.notificationStage === "firestore") {
+    return `알림 기기 정보를 저장하지 못했습니다. (${error.code || "save-error"})`;
+  }
+  if (error?.notificationStage === "settings") {
+    return `알림 설정을 저장하지 못했습니다. (${error.code || "settings-error"})`;
+  }
+  return `알림 설정을 변경하지 못했습니다. (${error?.code || "unknown-error"})`;
 }
 
 async function disableDailyNotifications() {
@@ -4599,13 +4647,16 @@ async function toggleDailyNotifications() {
       setMessage("mypage-notification-message", "말씀 알림을 켰습니다.", "success");
     }
   } catch (error) {
-    const message = error?.message === "missing-vapid-key"
-      ? "관리자가 알림 설정을 마무리한 뒤 이용할 수 있습니다."
-      : error?.message === "permission-denied"
-        ? "알림이 차단되었습니다. 휴대폰 설정에서 알림을 허용해 주세요."
-        : "알림 설정을 변경하지 못했습니다. 잠시 후 다시 시도해 주세요.";
-    setMessage("mypage-notification-message", message, "error");
-    await refreshNotificationSettingsUI();
+    console.error("Notification registration failed", error);
+    const statusText = Notification.permission === "granted"
+      ? "휴대폰 알림 권한은 허용되어 있습니다."
+      : "현재 알림을 받지 않고 있습니다.";
+    setNotificationUI(false, statusText);
+    setMessage(
+      "mypage-notification-message",
+      getNotificationErrorMessage(error),
+      "error"
+    );
   } finally {
     button.disabled = false;
   }
