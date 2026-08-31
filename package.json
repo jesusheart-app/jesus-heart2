@@ -1,0 +1,11 @@
+{
+  "name": "jesus-heart2-notifications",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "send-reminder": "node scripts/send-daily-reminder.mjs"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.5.0"
+  }
+}

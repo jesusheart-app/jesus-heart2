@@ -1329,6 +1329,32 @@ service cloud.firestore {
       allow delete: if isApprovedAdmin();
     }
 
+    match /notificationDevices/{deviceId} {
+      allow read: if signedIn() && resource.data.uid == request.auth.uid;
+
+      allow create: if isApprovedMember()
+        && request.resource.data.keys().hasOnly([
+          'uid', 'token', 'enabled', 'createdAt', 'updatedAt'
+        ])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.token is string
+        && request.resource.data.token.size() >= 20
+        && request.resource.data.enabled == true
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+
+      allow update: if isApprovedMember()
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.token is string
+        && request.resource.data.token.size() >= 20
+        && request.resource.data.enabled == true
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.updatedAt == request.time;
+
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }
