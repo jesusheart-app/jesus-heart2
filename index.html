@@ -1177,9 +1177,12 @@
 
           <div id="memory-passage-text" class="memory-passage-text"></div>
 
-          <details id="memory-passage-admin" class="memory-passage-admin collapsible-card" hidden>
-            <summary>＋ 암송 말씀 등록·관리</summary>
-            <div class="collapsible-content">
+          <button id="memory-admin-open-button" class="secondary-button management-open-button" type="button" onclick="openManagementPanel('memory-passage-admin')" hidden>암송 말씀 등록·관리</button>
+
+          <div id="memory-passage-admin" class="management-overlay" role="dialog" aria-modal="true" aria-labelledby="memory-admin-title" hidden>
+            <div class="management-panel">
+            <div class="management-panel-header"><h2 id="memory-admin-title">암송 말씀 등록·관리</h2><button class="management-close-button" type="button" onclick="closeManagementPanel('memory-passage-admin')" aria-label="닫기">×</button></div>
+            <div class="management-panel-content memory-passage-admin">
             <p>암송 말씀을 한 절씩 등록하고 이번 달 말씀을 선택할 수 있습니다.</p>
             <label for="memory-passage-year">연도</label>
             <input id="memory-passage-year" type="number" min="2020" max="2100" inputmode="numeric">
@@ -1191,7 +1194,8 @@
             <button id="memory-passage-cancel-button" class="text-button" type="button" onclick="resetMemoryPassageForm()" hidden>수정 취소</button>
             <div id="memory-admin-verse-list" class="memory-admin-verse-list"></div>
             </div>
-          </details>
+            </div>
+          </div>
 
         </div>
 
@@ -1296,10 +1300,14 @@
 
       <main class="page-content word-room-content">
 
-        <details id="word-room-create-section" class="page-card collapsible-card">
+        <div class="page-card management-launch-card">
+          <button class="primary-button management-open-button" type="button" onclick="openWordRoomCreatePanel()">＋ 새 모임방 만들기</button>
+        </div>
 
-          <summary>＋ 새 모임방 만들기</summary>
-          <div class="collapsible-content">
+        <div id="word-room-create-section" class="management-overlay" role="dialog" aria-modal="true" aria-labelledby="word-room-create-title" hidden>
+          <div class="management-panel">
+          <div class="management-panel-header"><h2 id="word-room-create-title">새 모임방 만들기</h2><button class="management-close-button" type="button" onclick="closeWordRoomCreatePanel()" aria-label="닫기">×</button></div>
+          <div class="management-panel-content">
 
           <p>
             말씀을 읽거나 함께 기도할 소그룹 공간을 만들어보세요.
@@ -1359,8 +1367,8 @@
           </div>
 
           </div>
-
-        </details>
+          </div>
+        </div>
 
 
         <div class="page-card">
@@ -1419,20 +1427,28 @@
         </div>
 
 
-        <details id="word-room-invite-section" class="page-card collapsible-card" hidden>
-          <summary>＋ 회원 초대</summary>
-          <div class="collapsible-content">
+        <div id="word-room-management-buttons" class="management-button-row" hidden>
+          <button id="word-room-invite-open-button" class="secondary-button" type="button" onclick="openManagementPanel('word-room-invite-section')">회원 초대</button>
+          <button id="word-room-plan-open-button" class="secondary-button" type="button" onclick="openManagementPanel('word-room-plan-form-section')">공동 계획 설정</button>
+        </div>
+
+        <div id="word-room-invite-section" class="management-overlay" role="dialog" aria-modal="true" aria-labelledby="word-room-invite-title" hidden>
+          <div class="management-panel">
+          <div class="management-panel-header"><h2 id="word-room-invite-title">회원 초대</h2><button class="management-close-button" type="button" onclick="closeManagementPanel('word-room-invite-section')" aria-label="닫기">×</button></div>
+          <div class="management-panel-content">
           <p>승인된 회원을 이 모임방에 초대할 수 있습니다.</p>
           <div class="word-room-invite-form">
             <select id="word-room-invite-member" aria-label="초대할 회원"></select>
             <button id="word-room-invite-button" class="primary-button" type="button" onclick="inviteWordRoomMember()">회원 초대</button>
           </div>
           </div>
-        </details>
+          </div>
+        </div>
 
-        <details id="word-room-plan-form-section" class="page-card collapsible-card" hidden>
-          <summary id="word-room-plan-form-heading">＋ 공동 계획 설정</summary>
-          <div class="collapsible-content">
+        <div id="word-room-plan-form-section" class="management-overlay" role="dialog" aria-modal="true" aria-labelledby="word-room-plan-form-heading" hidden>
+          <div class="management-panel">
+          <div class="management-panel-header"><h2 id="word-room-plan-form-heading">공동 계획 설정</h2><button class="management-close-button" type="button" onclick="closeManagementPanel('word-room-plan-form-section')" aria-label="닫기">×</button></div>
+          <div class="management-panel-content">
           <p id="word-room-plan-form-description">날짜별로 함께 읽을 말씀을 정해주세요.</p>
           <div class="word-room-plan-form">
             <label id="word-room-plan-date-label" for="word-room-plan-date">읽는 날짜</label>
@@ -1446,7 +1462,8 @@
             <div id="word-room-plan-message" class="start-message word-room-message" aria-live="polite"></div>
           </div>
           </div>
-        </details>
+          </div>
+        </div>
 
         <div id="word-room-prayer-topic-form-section" class="page-card" hidden>
           <h2>나의 기도제목 나누기</h2>
