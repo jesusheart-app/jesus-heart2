@@ -1707,6 +1707,19 @@
     .mypage-days-guide,
     .mypage-notification-guide { color: #81786D !important; font-size: 13px; }
 
+    .mypage-notification-setting {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      margin-top: 22px;
+      padding-top: 18px;
+      border-top: 1px solid #EEE7DD;
+    }
+    .mypage-notification-setting strong { color: #443C34; }
+    .mypage-notification-setting p { margin: 5px 0 0 !important; color: #81786D !important; font-size: 13px; }
+    .mypage-notification-setting button { width: auto; min-width: 105px; margin: 0; }
+
     .word-room-leave-button {
       width: auto;
       min-height: 40px;

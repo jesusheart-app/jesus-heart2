@@ -1,0 +1,39 @@
+name: Daily word reminder
+
+on:
+  schedule:
+    # 한국 시간: 월 09:17, 화 14:23, 수 19:37, 목 10:41,
+    # 금 20:13, 토 15:29, 일 21:07
+    - cron: "17 0 * * 1"
+    - cron: "23 5 * * 2"
+    - cron: "37 10 * * 3"
+    - cron: "41 1 * * 4"
+    - cron: "13 11 * * 5"
+    - cron: "29 6 * * 6"
+    - cron: "7 12 * * 0"
+  workflow_dispatch:
+    inputs:
+      force_send:
+        description: "오늘 이미 발송했어도 테스트 알림 보내기"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --omit=dev
+      - run: npm run send-reminder
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          FORCE_SEND: ${{ inputs.force_send || 'false' }}

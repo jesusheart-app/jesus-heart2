@@ -26,6 +26,12 @@ import {
   where,
   writeBatch
 } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+import {
+  deleteToken,
+  getMessaging,
+  getToken,
+  isSupported as isMessagingSupported
+} from "https://www.gstatic.com/firebasejs/12.18.0/firebase-messaging.js";
 import { firebaseConfig } from "./firebase-config.js";
 import { appSettings } from "./app-settings.js";
 
@@ -67,6 +73,9 @@ let editingWordRoomPrayerTopicId = null;
 let bibleCalendarDate = new Date();
 let bibleCheckRecordIds = new Set();
 let selectedMemoryYear = new Date().getFullYear();
+let messaging = null;
+let messagingServiceWorker = null;
+let currentNotificationToken = null;
 
 const communityPrayerReactionTypes = [
   { key: "prayer", countField: "reactionPrayerCount", emoji: "🙏", label: "기도할게요" },
@@ -286,6 +295,15 @@ async function routeAuthenticatedUser(user) {
     `${profile.name}님, 반갑습니다.`;
   applyFontSize(profile.settings?.fontSize || "normal");
   showScreen("home-screen", { historyMode: "replace" });
+
+  if (new URLSearchParams(window.location.search).get("open") === "bible-check") {
+    history.replaceState(
+      { screenId: "home-screen" },
+      "",
+      window.location.pathname
+    );
+    await openBibleCheck();
+  }
 }
 
 async function login() {
@@ -4470,6 +4488,127 @@ function openMyPage() {
     currentUserProfile.settings?.fontSize || "normal";
   setMessage("mypage-settings-message", "");
   showScreen("mypage-screen");
+  refreshNotificationSettingsUI();
+}
+
+async function prepareMessaging() {
+  if (messaging && messagingServiceWorker) return true;
+  if (!(await isMessagingSupported()) || !("serviceWorker" in navigator)) return false;
+
+  messagingServiceWorker = await navigator.serviceWorker.register(
+    "./firebase-messaging-sw.js",
+    { scope: "./" }
+  );
+  messaging = getMessaging(firebaseApp);
+  return true;
+}
+
+function setNotificationUI(enabled, statusText) {
+  const button = document.getElementById("mypage-notification-button");
+  const status = document.getElementById("mypage-notification-status");
+  if (!button || !status) return;
+  button.textContent = enabled ? "알림 끄기" : "알림 받기";
+  button.dataset.enabled = enabled ? "true" : "false";
+  status.textContent = statusText;
+}
+
+async function refreshNotificationSettingsUI() {
+  setMessage("mypage-notification-message", "");
+  if (!(await isMessagingSupported())) {
+    setNotificationUI(false, "이 브라우저에서는 알림을 지원하지 않습니다.");
+    document.getElementById("mypage-notification-button").disabled = true;
+    return;
+  }
+
+  const enabled = currentUserProfile?.settings?.notifications === true &&
+    Notification.permission === "granted";
+  const statusText = Notification.permission === "denied"
+    ? "휴대폰 설정에서 이 앱의 알림을 허용해 주세요."
+    : enabled
+      ? "매일 말씀 알림을 받고 있습니다."
+      : "현재 알림을 받지 않고 있습니다.";
+  setNotificationUI(enabled, statusText);
+}
+
+async function saveNotificationPreference(enabled) {
+  const settings = {
+    fontSize: currentUserProfile.settings?.fontSize || "normal",
+    notifications: enabled
+  };
+  await updateDoc(doc(db, "users", auth.currentUser.uid), { settings });
+  currentUserProfile = { ...currentUserProfile, settings };
+}
+
+async function enableDailyNotifications() {
+  if (!appSettings.firebaseWebPushPublicKey) throw new Error("missing-vapid-key");
+  if (!(await prepareMessaging())) throw new Error("unsupported-messaging");
+
+  const permission = await Notification.requestPermission();
+  if (permission !== "granted") throw new Error("permission-denied");
+
+  const token = await getToken(messaging, {
+    vapidKey: appSettings.firebaseWebPushPublicKey,
+    serviceWorkerRegistration: messagingServiceWorker
+  });
+  if (!token) throw new Error("missing-token");
+
+  const deviceReference = doc(db, "notificationDevices", await sha256(token));
+  const existingDevice = await getDoc(deviceReference);
+  const deviceData = {
+    uid: auth.currentUser.uid,
+    token,
+    enabled: true,
+    updatedAt: serverTimestamp()
+  };
+  if (!existingDevice.exists()) deviceData.createdAt = serverTimestamp();
+  await setDoc(deviceReference, deviceData, { merge: true });
+  await saveNotificationPreference(true);
+  currentNotificationToken = token;
+}
+
+async function disableDailyNotifications() {
+  if (await prepareMessaging()) {
+    const token = currentNotificationToken || await getToken(messaging, {
+      vapidKey: appSettings.firebaseWebPushPublicKey,
+      serviceWorkerRegistration: messagingServiceWorker
+    }).catch(() => null);
+    if (token) {
+      await deleteDoc(doc(db, "notificationDevices", await sha256(token)));
+      await deleteToken(messaging).catch(() => false);
+    }
+  }
+  currentNotificationToken = null;
+  await saveNotificationPreference(false);
+}
+
+async function toggleDailyNotifications() {
+  if (!auth.currentUser || currentUserProfile?.approved !== true) return;
+  const button = document.getElementById("mypage-notification-button");
+  const currentlyEnabled = button.dataset.enabled === "true";
+  setBusy(button.id, true, "처리 중...", currentlyEnabled ? "알림 끄기" : "알림 받기");
+  setMessage("mypage-notification-message", "");
+
+  try {
+    if (currentlyEnabled) {
+      await disableDailyNotifications();
+      setNotificationUI(false, "현재 알림을 받지 않고 있습니다.");
+      setMessage("mypage-notification-message", "말씀 알림을 껐습니다.", "success");
+    } else {
+      await enableDailyNotifications();
+      setNotificationUI(true, "매일 말씀 알림을 받고 있습니다.");
+      setMessage("mypage-notification-message", "말씀 알림을 켰습니다.", "success");
+    }
+  } catch (error) {
+    const message = error?.message === "missing-vapid-key"
+      ? "관리자가 알림 설정을 마무리한 뒤 이용할 수 있습니다."
+      : error?.message === "permission-denied"
+        ? "알림이 차단되었습니다. 휴대폰 설정에서 알림을 허용해 주세요."
+        : "알림 설정을 변경하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+    setMessage("mypage-notification-message", message, "error");
+    await refreshNotificationSettingsUI();
+  } finally {
+    button.disabled = false;
+  }
 }
 
 async function saveMyPageSettings() {
@@ -4911,6 +5050,7 @@ window.saveNews = saveNews;
 window.resetNewsForm = resetNewsForm;
 window.openMyPage = openMyPage;
 window.saveMyPageSettings = saveMyPageSettings;
+window.toggleDailyNotifications = toggleDailyNotifications;
 window.openWordRoom = openWordRoom;
 window.saveWordRoom = saveWordRoom;
 window.resetWordRoomForm = resetWordRoomForm;
