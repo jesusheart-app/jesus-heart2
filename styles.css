@@ -768,6 +768,10 @@
     .management-button-row[hidden] { display: none; }
     .management-button-row button { min-height: 46px; margin: 0; }
 
+    .community-list-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .community-list-heading h2 { margin: 0; }
+    .compact-compose-button { width: auto; min-height: 42px; margin: 0; padding: 9px 13px; white-space: nowrap; font-size: 13px; }
+
     /* ========================================
        암송 체크 데이터 뼈대
     ======================================== */
@@ -1847,6 +1851,8 @@
       .memory-chunk-button,
       .memory-selected-chunk { width: 100%; justify-content: flex-start; text-align: left; }
       .word-room-member-actions { grid-template-columns: 1fr; }
+      .community-list-heading { align-items: stretch; flex-direction: column; }
+      .compact-compose-button { width: 100%; }
       .prayer-reaction-button,
       .word-room-reaction-button { padding-left: 4px; padding-right: 4px; font-size: 10px; }
       .bible-calendar-day { min-height: 42px; }

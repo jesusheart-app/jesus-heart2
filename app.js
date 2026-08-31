@@ -1716,6 +1716,16 @@ function resetCommunityPrayerForm() {
   setMessage("community-prayer-message", "");
 }
 
+function openCommunityPrayerComposePanel() {
+  resetCommunityPrayerForm();
+  openManagementPanel("community-prayer-compose-panel");
+}
+
+function closeCommunityPrayerComposePanel() {
+  resetCommunityPrayerForm();
+  closeManagementPanel("community-prayer-compose-panel");
+}
+
 async function toggleCommunityPrayerReaction(prayer, reactionType) {
   if (!auth.currentUser || prayer.uid === auth.currentUser.uid) {
     return;
@@ -2152,9 +2162,10 @@ async function saveCommunityPrayer() {
     }
 
     resetCommunityPrayerForm();
+    closeManagementPanel("community-prayer-compose-panel");
     await loadCommunityPrayers();
     setMessage(
-      "community-prayer-message",
+      "community-prayer-list-message",
       wasEditing
         ? "기도 나눔을 수정했습니다."
         : "기도제목을 함께 나눴습니다.",
@@ -2184,6 +2195,7 @@ function editCommunityPrayer(prayerId) {
   }
 
   editingCommunityPrayerId = prayerId;
+  openManagementPanel("community-prayer-compose-panel");
   document.getElementById("community-prayer-title").value =
     prayer.title;
   document.getElementById("community-prayer-content").value =
@@ -2196,7 +2208,6 @@ function editCommunityPrayer(prayerId) {
     false;
   setMessage("community-prayer-message", "수정할 내용을 확인해주세요.");
   document.getElementById("community-prayer-title").focus();
-  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 async function deleteCommunityPrayer(prayerId) {
@@ -2227,7 +2238,7 @@ async function deleteCommunityPrayer(prayerId) {
     }
     await loadCommunityPrayers();
     setMessage(
-      "community-prayer-message",
+      "community-prayer-list-message",
       "기도 나눔을 삭제했습니다.",
       "success"
     );
@@ -2755,6 +2766,16 @@ function resetCommunityGratitudeForm() {
   setMessage("community-gratitude-message", "");
 }
 
+function openCommunityGratitudeComposePanel() {
+  resetCommunityGratitudeForm();
+  openManagementPanel("community-gratitude-compose-panel");
+}
+
+function closeCommunityGratitudeComposePanel() {
+  resetCommunityGratitudeForm();
+  closeManagementPanel("community-gratitude-compose-panel");
+}
+
 async function toggleCommunityGratitudeReaction(
   gratitude,
   reactionType
@@ -3206,9 +3227,10 @@ async function saveCommunityGratitude() {
     }
 
     resetCommunityGratitudeForm();
+    closeManagementPanel("community-gratitude-compose-panel");
     await loadCommunityGratitudes();
     setMessage(
-      "community-gratitude-message",
+      "community-gratitude-list-message",
       wasEditing ? "감사 나눔을 수정했습니다." : "감사를 함께 나눴습니다.",
       "success"
     );
@@ -3236,6 +3258,7 @@ function editCommunityGratitude(gratitudeId) {
   }
 
   editingCommunityGratitudeId = gratitudeId;
+  openManagementPanel("community-gratitude-compose-panel");
   document.getElementById("community-gratitude-content").value =
     gratitude.content;
   document.getElementById("community-gratitude-save-button").textContent =
@@ -3244,7 +3267,6 @@ function editCommunityGratitude(gratitudeId) {
     false;
   setMessage("community-gratitude-message", "수정할 내용을 확인해주세요.");
   document.getElementById("community-gratitude-content").focus();
-  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 async function deleteCommunityGratitude(gratitudeId) {
@@ -3284,7 +3306,7 @@ async function deleteCommunityGratitude(gratitudeId) {
     }
     await loadCommunityGratitudes();
     setMessage(
-      "community-gratitude-message",
+      "community-gratitude-list-message",
       "감사 나눔을 삭제했습니다.",
       "success"
     );
@@ -4900,6 +4922,8 @@ window.saveWordRoomPrayerTopic = saveWordRoomPrayerTopic;
 window.resetWordRoomPrayerTopicForm = resetWordRoomPrayerTopicForm;
 window.toggleWordRoomPlans = toggleWordRoomPlans;
 window.showGratitudeTab = showGratitudeTab;
+window.openCommunityGratitudeComposePanel = openCommunityGratitudeComposePanel;
+window.closeCommunityGratitudeComposePanel = closeCommunityGratitudeComposePanel;
 window.savePrivateGratitude = savePrivateGratitude;
 window.resetPrivateGratitudeForm = resetPrivateGratitudeForm;
 window.saveCommunityGratitude = saveCommunityGratitude;
@@ -4907,6 +4931,8 @@ window.resetCommunityGratitudeForm = resetCommunityGratitudeForm;
 window.saveWordNote = saveWordNote;
 window.resetWordNoteForm = resetWordNoteForm;
 window.showPrayerTab = showPrayerTab;
+window.openCommunityPrayerComposePanel = openCommunityPrayerComposePanel;
+window.closeCommunityPrayerComposePanel = closeCommunityPrayerComposePanel;
 window.savePrivatePrayer = savePrivatePrayer;
 window.resetPrivatePrayerForm = resetPrivatePrayerForm;
 window.saveCommunityPrayer = saveCommunityPrayer;

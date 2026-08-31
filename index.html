@@ -764,12 +764,19 @@
         >
 
           <div class="page-card">
+            <div class="community-list-heading">
+              <h2>함께 기도해요</h2>
+              <button class="primary-button compact-compose-button" type="button" onclick="openCommunityPrayerComposePanel()">＋ 기도제목 나누기</button>
+            </div>
+            <div id="community-prayer-list-message" class="start-message" aria-live="polite"></div>
+            <div id="community-prayer-list" class="prayer-record-list"></div>
+          </div>
 
-            <h2>기도제목 나누기</h2>
-
-            <p>
-              서로의 기도 제목을 나누며 함께 기도해요.
-            </p>
+          <div id="community-prayer-compose-panel" class="management-overlay" role="dialog" aria-modal="true" aria-labelledby="community-prayer-compose-title" hidden>
+            <div class="management-panel">
+            <div class="management-panel-header"><h2 id="community-prayer-compose-title">기도제목 나누기</h2><button class="management-close-button" type="button" onclick="closeCommunityPrayerComposePanel()" aria-label="닫기">×</button></div>
+            <div class="management-panel-content">
+            <p>서로의 기도 제목을 나누며 함께 기도해요.</p>
 
             <div class="prayer-form">
 
@@ -817,7 +824,7 @@
                 id="community-prayer-cancel-button"
                 class="secondary-button prayer-cancel-button"
                 type="button"
-                onclick="resetCommunityPrayerForm()"
+                onclick="closeCommunityPrayerComposePanel()"
                 hidden
               >
                 수정 취소
@@ -830,19 +837,8 @@
               ></div>
 
             </div>
-
-          </div>
-
-
-          <div class="page-card">
-
-            <h2>함께 기도해요</h2>
-
-            <div
-              id="community-prayer-list"
-              class="prayer-record-list"
-            ></div>
-
+            </div>
+            </div>
           </div>
 
         </section>
@@ -1077,9 +1073,18 @@
         >
 
           <div class="page-card">
+            <div class="community-list-heading">
+              <h2>함께 감사해요</h2>
+              <button class="primary-button compact-compose-button" type="button" onclick="openCommunityGratitudeComposePanel()">＋ 감사 나누기</button>
+            </div>
+            <div id="community-gratitude-list-message" class="start-message" aria-live="polite"></div>
+            <div id="community-gratitude-list" class="gratitude-list"></div>
+          </div>
 
-            <h2>감사 나누기</h2>
-
+          <div id="community-gratitude-compose-panel" class="management-overlay" role="dialog" aria-modal="true" aria-labelledby="community-gratitude-compose-title" hidden>
+            <div class="management-panel">
+            <div class="management-panel-header"><h2 id="community-gratitude-compose-title">감사 나누기</h2><button class="management-close-button" type="button" onclick="closeCommunityGratitudeComposePanel()" aria-label="닫기">×</button></div>
+            <div class="management-panel-content">
             <p>서로의 감사를 나누며 함께 기뻐해요.</p>
 
             <div class="gratitude-form">
@@ -1106,7 +1111,7 @@
                 id="community-gratitude-cancel-button"
                 class="secondary-button gratitude-cancel-button"
                 type="button"
-                onclick="resetCommunityGratitudeForm()"
+                onclick="closeCommunityGratitudeComposePanel()"
                 hidden
               >
                 수정 취소
@@ -1119,19 +1124,8 @@
               ></div>
 
             </div>
-
-          </div>
-
-
-          <div class="page-card">
-
-            <h2>함께 감사해요</h2>
-
-            <div
-              id="community-gratitude-list"
-              class="gratitude-list"
-            ></div>
-
+            </div>
+            </div>
           </div>
 
         </section>
