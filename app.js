@@ -4566,16 +4566,15 @@ async function enableDailyNotifications() {
   if (!token) throw new Error("missing-token");
 
   const deviceReference = doc(db, "notificationDevices", await sha256(token));
-  const existingDevice = await getDoc(deviceReference);
   const deviceData = {
     uid: auth.currentUser.uid,
     token,
     enabled: true,
+    createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
   };
-  if (!existingDevice.exists()) deviceData.createdAt = serverTimestamp();
   try {
-    await setDoc(deviceReference, deviceData, { merge: true });
+    await setDoc(deviceReference, deviceData);
   } catch (error) {
     error.notificationStage = "firestore";
     throw error;
