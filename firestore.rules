@@ -23,6 +23,14 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
+    function isWordRoomMember(roomId) {
+      return isApprovedMember()
+        && exists(/databases/$(database)/documents/wordRooms/$(roomId))
+        && request.auth.uid in get(
+          /databases/$(database)/documents/wordRooms/$(roomId)
+        ).data.memberUids;
+    }
+
     function hadPrayerReaction(prayerId, uid) {
       return exists(
           /databases/$(database)/documents/communityPrayers/$(prayerId)/privateReactions/$(uid)
@@ -1122,6 +1130,7 @@ service cloud.firestore {
         && request.resource.data.reactionGraceCount == 0
         && request.resource.data.createdAt == request.time;
       allow update: if isApprovedMember()
+        && isWordRoomMember(roomId)
         && resource.data.uid != request.auth.uid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactionAmenCount', 'reactionGraceCount'])
         && request.resource.data.reactionAmenCount == resource.data.reactionAmenCount
@@ -1138,9 +1147,9 @@ service cloud.firestore {
     }
 
     match /wordRooms/{roomId}/plans/{planId}/comments/{commentId}/privateReactions/{uid} {
-      allow read: if isOwner(uid) && isApprovedMember();
+      allow read: if isOwner(uid) && isWordRoomMember(roomId);
       allow create, update: if isOwner(uid)
-        && isApprovedMember()
+        && isWordRoomMember(roomId)
         && request.resource.data.keys().hasOnly(['amen', 'grace', 'updatedAt'])
         && request.resource.data.amen is bool
         && request.resource.data.grace is bool
@@ -1170,7 +1179,7 @@ service cloud.firestore {
         && request.resource.data.reactionPrayerCount == 0
         && request.resource.data.createdAt == request.time
         && request.resource.data.updatedAt == request.time;
-      allow update: if isApprovedMember() && (
+      allow update: if isWordRoomMember(roomId) && (
         (
           resource.data.uid == request.auth.uid
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['date', 'title', 'content', 'updatedAt'])
@@ -1204,8 +1213,8 @@ service cloud.firestore {
     }
 
     match /wordRooms/{roomId}/prayerTopics/{topicId}/privateReactions/{uid} {
-      allow read: if isOwner(uid) && isApprovedMember();
-      allow create, update: if isOwner(uid) && isApprovedMember()
+      allow read: if isOwner(uid) && isWordRoomMember(roomId);
+      allow create, update: if isOwner(uid) && isWordRoomMember(roomId)
         && request.resource.data.keys().hasOnly(['amen', 'prayer', 'updatedAt'])
         && request.resource.data.amen is bool
         && request.resource.data.prayer is bool
