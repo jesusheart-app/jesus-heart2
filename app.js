@@ -295,6 +295,7 @@ async function routeAuthenticatedUser(user) {
     `${profile.name}님, 반갑습니다.`;
   applyFontSize(profile.settings?.fontSize || "normal");
   showScreen("home-screen", { historyMode: "replace" });
+  void loadHomeLatestNews();
 
   if (new URLSearchParams(window.location.search).get("open") === "bible-check") {
     history.replaceState(
@@ -4305,6 +4306,40 @@ function resetNewsForm() {
   setMessage("news-admin-message", "");
 }
 
+async function loadHomeLatestNews() {
+  const card = document.getElementById("home-latest-news");
+  if (!card || !auth.currentUser || currentUserProfile?.approved !== true) return;
+
+  card.hidden = true;
+  try {
+    const snapshot = await getDocs(query(
+      collection(db, "churchNews"),
+      orderBy("createdAt", "desc"),
+      limit(20)
+    ));
+    const newsItems = snapshot.docs
+      .map((newsDocument) => ({ id: newsDocument.id, ...newsDocument.data() }))
+      .sort((first, second) => {
+        if (first.pinned !== second.pinned) return first.pinned ? -1 : 1;
+        return (second.createdAt?.toMillis?.() || 0) -
+          (first.createdAt?.toMillis?.() || 0);
+      });
+    const latestNews = newsItems[0];
+    if (!latestNews) return;
+
+    document.getElementById("home-latest-news-title").textContent = latestNews.title;
+    document.getElementById("home-latest-news-date").textContent = latestNews.eventDate
+      ? "일정 · " + new Date(latestNews.eventDate + "T00:00:00")
+        .toLocaleDateString("ko-KR", { month: "long", day: "numeric", weekday: "short" })
+      : formatPrayerDate(latestNews.createdAt);
+    document.getElementById("home-latest-news-content").textContent = latestNews.content;
+    document.getElementById("home-latest-news-badge").hidden = latestNews.pinned !== true;
+    card.hidden = false;
+  } catch {
+    // 교회소식을 불러오지 못해도 홈 화면의 다른 기능은 그대로 이용합니다.
+  }
+}
+
 function renderNews(documents) {
   const list = document.getElementById("news-list");
   list.replaceChildren();
@@ -4420,6 +4455,7 @@ async function saveNews() {
     }
     resetNewsForm();
     await loadNews();
+    void loadHomeLatestNews();
     setMessage("news-admin-message", wasEditing ? "교회소식을 수정했습니다." : "교회소식을 등록했습니다.", "success");
   } catch {
     setMessage("news-admin-message", "교회소식을 저장하지 못했습니다.", "error");
@@ -4447,6 +4483,7 @@ async function deleteNews(newsId) {
   try {
     await deleteDoc(doc(db, "churchNews", newsId));
     if (editingNewsId === newsId) resetNewsForm();
+    void loadHomeLatestNews();
     await loadNews();
     setMessage("news-admin-message", "교회소식을 삭제했습니다.", "success");
   } catch {
