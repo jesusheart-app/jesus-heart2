@@ -320,6 +320,8 @@
 
           <p id="welcome-name" class="welcome-name"></p>
 
+          <p id="welcome-days" class="welcome-days"></p>
+
           <p id="daily-message">
             오늘도 주님과 함께 걸어가요.
           </p>
@@ -403,10 +405,12 @@
 
 
         <button
+          id="news-admin-home-button"
           class="news-button"
           onclick="openNews()"
+          hidden
         >
-          ⛪ 교회소식
+          ⛪ 교회소식 관리
         </button>
 
         <button
@@ -1276,10 +1280,21 @@
 
           <h2>나의 암송 기록</h2>
 
-          <div
-            id="memory-check-history"
-            class="memory-check-history"
-          ></div>
+          <div class="memory-calendar-header">
+            <button type="button" class="calendar-nav-button" onclick="changeMemoryCalendarMonth(-1)" aria-label="이전 달">‹</button>
+            <strong id="memory-calendar-title"></strong>
+            <button type="button" class="calendar-nav-button" onclick="changeMemoryCalendarMonth(1)" aria-label="다음 달">›</button>
+          </div>
+          <div class="memory-calendar-weekdays" aria-hidden="true">
+            <span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span>
+          </div>
+          <div id="memory-check-history" class="memory-calendar"></div>
+          <div class="memory-calendar-legend" aria-label="암송 상태 색상 안내">
+            <span class="practicing">● 연습 중</span>
+            <span class="almost">● 거의 외웠어요</span>
+            <span class="memorized">✓ 외웠어요</span>
+          </div>
+          <p id="memory-calendar-detail" class="memory-calendar-detail">기록된 날짜를 누르면 내용을 볼 수 있어요.</p>
 
         </div>
 
@@ -1425,16 +1440,6 @@
             class="word-room-detail-meta"
           ></p>
 
-          <button
-            id="word-room-leave-button"
-            class="secondary-button word-room-leave-button"
-            type="button"
-            onclick="leaveWordRoom()"
-            hidden
-          >
-            방 나가기
-          </button>
-
         </div>
 
 
@@ -1499,6 +1504,11 @@
 
         <div class="page-card">
           <h2 id="word-room-plan-list-heading">날짜별 말씀 계획</h2>
+          <div id="word-room-plan-month-controls" class="word-room-plan-month-controls" hidden>
+            <button type="button" onclick="changeWordRoomPlanMonth(-1)" aria-label="이전 달">‹</button>
+            <strong id="word-room-plan-month-title"></strong>
+            <button type="button" onclick="changeWordRoomPlanMonth(1)" aria-label="다음 달">›</button>
+          </div>
           <div id="word-room-plan-list" class="word-room-plan-list"></div>
           <button id="word-room-plan-toggle-button" class="secondary-button" type="button" onclick="toggleWordRoomPlans()" hidden>전체 계획 보기</button>
         </div>
@@ -1508,6 +1518,14 @@
           <div id="word-room-member-list" class="word-room-member-list"></div>
           <div id="word-room-detail-message" class="start-message word-room-message" aria-live="polite"></div>
         </div>
+
+        <button
+          id="word-room-leave-button"
+          class="word-room-leave-button"
+          type="button"
+          onclick="leaveWordRoom()"
+          hidden
+        >방 나가기</button>
 
       </main>
 
