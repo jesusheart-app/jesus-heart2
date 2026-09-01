@@ -82,8 +82,8 @@ for (let index = 0; index < devices.length; index += 500) {
     webpush: {
       fcmOptions: { link: appUrl },
       notification: {
-        icon: "https://jesusheart-app.github.io/jesus-heart2/app-icon.svg",
-        badge: "https://jesusheart-app.github.io/jesus-heart2/app-icon.svg",
+        icon: "https://jesusheart-app.github.io/jesus-heart2/notification-icon-192.png",
+        badge: "https://jesusheart-app.github.io/jesus-heart2/notification-badge-96.png",
         tag: `daily-word-${dateKey}`
       }
     }
