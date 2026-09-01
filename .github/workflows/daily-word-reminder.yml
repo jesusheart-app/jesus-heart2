@@ -3,12 +3,12 @@ name: Daily word reminder
 on:
   schedule:
     # 한국 시간: 월 09:17, 화 14:23, 수 19:37, 목 10:41,
-    # 금 20:13, 토 15:29, 일 21:07
+    # 금 16:13, 토 15:29, 일 21:07
     - cron: "17 0 * * 1"
     - cron: "23 5 * * 2"
     - cron: "37 10 * * 3"
     - cron: "41 1 * * 4"
-    - cron: "13 11 * * 5"
+    - cron: "13 7 * * 5"
     - cron: "29 6 * * 6"
     - cron: "7 12 * * 0"
   workflow_dispatch:
