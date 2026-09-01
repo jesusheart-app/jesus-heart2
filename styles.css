@@ -294,6 +294,27 @@
       font-weight: 700;
     }
 
+    .home-latest-news {
+      width: 100%;
+      margin: 0 0 18px;
+      padding: 18px 20px;
+      border: 1px solid #CDB792;
+      border-radius: 20px;
+      background: #FFFDF8;
+      box-shadow: 0 5px 18px rgba(70, 60, 50, 0.06);
+      color: #443C34;
+      text-align: left;
+    }
+
+    .home-latest-news[hidden] { display: none; }
+    .home-latest-news-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: #7A6249; font-size: 14px; font-weight: 800; }
+    .home-latest-news-badge { padding: 4px 8px; border-radius: 999px; background: #B46C59; color: #FFFFFF; font-size: 11px; }
+    .home-latest-news-badge[hidden] { display: none; }
+    .home-latest-news strong { display: block; margin-top: 11px; font-size: 18px; line-height: 1.4; }
+    .home-latest-news-date { display: block; margin-top: 6px; color: #81786D; font-size: 13px; font-weight: 650; }
+    .home-latest-news-content { display: -webkit-box; overflow: hidden; margin-top: 9px; color: #655C52; font-size: 14px; line-height: 1.6; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+    .home-latest-news-link { display: block; margin-top: 12px; color: #806D55; font-size: 13px; font-weight: 800; text-align: right; }
+
     .menu-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
