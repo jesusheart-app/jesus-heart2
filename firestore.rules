@@ -1349,7 +1349,7 @@ service cloud.firestore {
         && request.resource.data.token is string
         && request.resource.data.token.size() >= 20
         && request.resource.data.enabled == true
-        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.createdAt == request.time
         && request.resource.data.updatedAt == request.time;
 
       allow delete: if signedIn() && resource.data.uid == request.auth.uid;
