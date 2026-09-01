@@ -60,6 +60,7 @@ let wordRoomPlanCache = new Map();
 let editingWordRoomPlanId = null;
 let wordRoomPlans = [];
 let showAllWordRoomPlans = false;
+let wordRoomPlanMonth = new Date();
 let memoryPassage = null;
 let memoryChunks = [];
 let memoryAvailableChunks = [];
@@ -72,6 +73,8 @@ let wordRoomPrayerTopicCache = new Map();
 let editingWordRoomPrayerTopicId = null;
 let bibleCalendarDate = new Date();
 let bibleCheckRecordIds = new Set();
+let memoryCalendarDate = new Date();
+let memoryCheckRecords = new Map();
 let selectedMemoryYear = new Date().getFullYear();
 let messaging = null;
 let messagingServiceWorker = null;
@@ -272,8 +275,12 @@ async function routeAuthenticatedUser(user) {
   currentUserProfile = profile;
 
   const adminHomeButton = document.getElementById("admin-home-button");
+  const newsAdminHomeButton = document.getElementById("news-admin-home-button");
   if (adminHomeButton) {
     adminHomeButton.hidden = !(profile.approved && profile.role === "admin");
+  }
+  if (newsAdminHomeButton) {
+    newsAdminHomeButton.hidden = !(profile.approved && profile.role === "admin");
   }
 
   if (!profile.approved) {
@@ -293,6 +300,10 @@ async function routeAuthenticatedUser(user) {
 
   document.getElementById("welcome-name").textContent =
     `${profile.name}님, 반갑습니다.`;
+  const daysTogether = calculateDaysTogether(profile.createdAt);
+  document.getElementById("welcome-days").textContent = daysTogether === "-"
+    ? "예수마음과 함께한 날을 확인하고 있어요."
+    : `예수마음과 함께한 지 ${daysTogether}일째예요.`;
   applyFontSize(profile.settings?.fontSize || "normal");
   showScreen("home-screen", { historyMode: "replace" });
   void loadHomeLatestNews();
@@ -1176,47 +1187,100 @@ function renderMemoryCheckState(record) {
 function renderMemoryCheckHistory(documents) {
   const list = document.getElementById("memory-check-history");
   list.replaceChildren();
+  memoryCheckRecords = new Map(documents.map((record) => [record.id, record.data()]));
+  renderMemoryCalendar();
+}
 
-  const records = documents
-    .sort((first, second) => second.id.localeCompare(first.id));
+function renderMemoryCalendar() {
+  const calendar = document.getElementById("memory-check-history");
+  const title = document.getElementById("memory-calendar-title");
+  if (!calendar || !title) return;
+  calendar.replaceChildren();
+  const year = memoryCalendarDate.getFullYear();
+  const month = memoryCalendarDate.getMonth();
+  title.textContent = `${year}년 ${month + 1}월`;
+  const firstWeekday = new Date(year, month, 1).getDay();
+  const lastDate = new Date(year, month + 1, 0).getDate();
+  const todayKey = getTodayDateKey();
 
-  if (records.length === 0) {
-    const empty = document.createElement("p");
-    empty.className = "memory-check-empty";
-    empty.textContent = "아직 암송을 기록한 날이 없습니다.";
-    list.append(empty);
-    return;
+  for (let index = 0; index < firstWeekday; index += 1) {
+    const blank = document.createElement("span");
+    blank.className = "memory-calendar-blank";
+    calendar.append(blank);
   }
 
-  records.forEach((record) => {
-    const row = document.createElement("div");
-    row.className = "memory-check-history-row";
+  for (let day = 1; day <= lastDate; day += 1) {
+    const dateKey = [year, String(month + 1).padStart(2, "0"), String(day).padStart(2, "0")].join("-");
+    const record = memoryCheckRecords.get(dateKey);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "memory-calendar-day";
+    if (dateKey === todayKey) button.classList.add("today");
+    if (record) {
+      button.classList.add("recorded", `assessment-${record.assessment}`);
+      button.title = getMemoryAssessmentLabel(record.assessment);
+      button.addEventListener("click", () => showMemoryCalendarRecord(dateKey));
+    } else {
+      button.disabled = true;
+    }
+    const number = document.createElement("span");
+    number.textContent = String(day);
+    button.append(number);
+    if (record) {
+      const mark = document.createElement("small");
+      mark.textContent = record.assessment === "memorized" ? "✓" : "●";
+      button.append(mark);
+    }
+    calendar.append(button);
+  }
+}
 
-    const date = document.createElement("span");
-    date.textContent = formatBibleCheckDate(record.id) + (record.data().verseReference ? " · " + record.data().verseReference : "");
+function showMemoryCalendarRecord(dateKey) {
+  const record = memoryCheckRecords.get(dateKey);
+  const detail = document.getElementById("memory-calendar-detail");
+  if (!record || !detail) return;
+  detail.textContent = `${formatBibleCheckDate(dateKey)} · ${record.verseReference || "암송 말씀"} · ${getMemoryAssessmentLabel(record.assessment)}`;
+}
 
-    const state = document.createElement("span");
-    state.className = "memory-check-history-state";
-    state.textContent = getMemoryAssessmentLabel(record.data().assessment);
+async function changeMemoryCalendarMonth(offset) {
+  memoryCalendarDate = new Date(
+    memoryCalendarDate.getFullYear(),
+    memoryCalendarDate.getMonth() + offset,
+    1
+  );
+  document.getElementById("memory-calendar-detail").textContent = "기록된 날짜를 누르면 내용을 볼 수 있어요.";
+  try {
+    await loadMemoryCheckMonth();
+  } catch {
+    setMessage("memory-check-message", "선택한 달의 암송 기록을 불러오지 못했습니다.", "error");
+  }
+}
 
-    row.append(date, state);
-    list.append(row);
-  });
+async function loadMemoryCheckMonth() {
+  const year = memoryCalendarDate.getFullYear();
+  const month = memoryCalendarDate.getMonth();
+  const monthStart = localDateKey(new Date(year, month, 1));
+  const monthEnd = localDateKey(new Date(year, month + 1, 0));
+  const snapshot = await getDocs(query(
+    collection(db, "users", auth.currentUser.uid, "memoryChecks"),
+    where("date", ">=", monthStart),
+    where("date", "<=", monthEnd),
+    orderBy("date", "asc"),
+    limit(31)
+  ));
+  renderMemoryCheckHistory(snapshot.docs);
 }
 
 async function loadMemoryChecks() {
   const today = getTodayDateKey();
-  const [todaySnapshot, historySnapshot] = await Promise.all([
+  const [todaySnapshot] = await Promise.all([
     getDoc(getMemoryCheckReference(today)),
-    getDocs(
-      collection(db, "users", auth.currentUser.uid, "memoryChecks")
-    )
+    loadMemoryCheckMonth()
   ]);
 
   const todayRecord = todaySnapshot.exists() && (!todaySnapshot.data().verseId || todaySnapshot.data().verseId === selectedMemoryVerseId)
     ? todaySnapshot.data() : null;
   renderMemoryCheckState(todayRecord);
-  renderMemoryCheckHistory(historySnapshot.docs);
 }
 
 async function openMemoryCheck() {
@@ -1226,6 +1290,7 @@ async function openMemoryCheck() {
   }
 
   showScreen("memory-screen");
+  memoryCalendarDate = new Date();
   closeManagementPanel("memory-passage-admin");
   setMessage("memory-check-message", "암송 기록을 불러오는 중입니다.");
 
@@ -3831,44 +3896,51 @@ function renderWordRoomPlans(plans, room) {
   const list = document.getElementById("word-room-plan-list");
   list.replaceChildren();
   wordRoomPlanCache = new Map(plans.map((plan) => [plan.id, plan]));
-  const today = new Date();
-  const todayKey = localDateKey(today);
-  const visiblePlans = showAllWordRoomPlans
-    ? plans
-    : plans.filter((plan) => plan.date === todayKey);
+  const todayKey = localDateKey(new Date());
 
   const toggleButton = document.getElementById("word-room-plan-toggle-button");
-  toggleButton.hidden = plans.length === 0;
+  const monthControls = document.getElementById("word-room-plan-month-controls");
+  toggleButton.hidden = false;
   toggleButton.textContent = showAllWordRoomPlans
     ? "오늘 계획만 보기"
     : "전체 계획 보기";
+  monthControls.hidden = !showAllWordRoomPlans;
+  if (showAllWordRoomPlans) {
+    document.getElementById("word-room-plan-month-title").textContent =
+      `${wordRoomPlanMonth.getFullYear()}년 ${wordRoomPlanMonth.getMonth() + 1}월`;
+  }
 
-  if (visiblePlans.length === 0) {
+  if (plans.length === 0) {
     const empty = document.createElement("p");
     empty.className = "word-room-empty";
     const typeLabel = getWordRoomType(room) === "prayer" ? "기도" : "말씀";
-    empty.textContent = plans.length === 0
-      ? "등록된 " + typeLabel + " 계획이 없습니다."
+    empty.textContent = showAllWordRoomPlans
+      ? "이 달에 등록된 " + typeLabel + " 계획이 없습니다."
       : "오늘 등록된 " + typeLabel + " 계획이 없습니다.";
     list.append(empty);
     return;
   }
 
-  visiblePlans.forEach((plan) => {
-    const card = document.createElement("article");
+  plans.forEach((plan) => {
+    const card = document.createElement("details");
     card.className = "word-room-plan-card";
+    card.open = !showAllWordRoomPlans;
+    const summary = document.createElement("summary");
     const date = document.createElement("strong");
     const dayLabel = plan.date === todayKey ? "오늘 · " : "";
     date.textContent = dayLabel + new Date(plan.date + "T00:00:00").toLocaleDateString("ko-KR", {
       year: "numeric", month: "long", day: "numeric", weekday: "short"
     });
-    const passage = document.createElement("h3");
+    const passage = document.createElement("span");
+    passage.className = "word-room-plan-summary-title";
     passage.textContent = plan.passage;
-    card.append(date, passage);
+    summary.append(date, passage);
+    const body = document.createElement("div");
+    body.className = "word-room-plan-body";
     if (plan.note) {
       const note = document.createElement("p");
       note.textContent = plan.note;
-      card.append(note);
+      body.append(note);
     }
     if (room.leaderUid === auth.currentUser.uid) {
       const actions = document.createElement("div");
@@ -3877,12 +3949,20 @@ function renderWordRoomPlans(plans, room) {
         createPrayerActionButton("✎ 수정", "compact-action-button", () => editWordRoomPlan(plan.id)),
         createPrayerActionButton("× 삭제", "compact-action-button", () => deleteWordRoomPlan(plan.id))
       );
-      card.append(actions);
+      body.append(actions);
     }
     const comments = document.createElement("div");
     comments.className = "word-room-plan-comments";
-    card.append(comments);
-    renderWordRoomPlanComments(room, plan, comments);
+    body.append(comments);
+    card.append(summary, body);
+    let commentsLoaded = false;
+    const loadComments = () => {
+      if (!card.open || commentsLoaded) return;
+      commentsLoaded = true;
+      renderWordRoomPlanComments(room, plan, comments);
+    };
+    card.addEventListener("toggle", loadComments);
+    loadComments();
     list.append(card);
   });
 }
@@ -3978,11 +4058,27 @@ async function renderWordRoomPlanComments(room, plan, container) {
 }
 
 async function loadWordRoomPlans(room) {
-  const plansQuery = query(
-    collection(db, "wordRooms", room.id, "plans"),
-    orderBy("date", "asc"),
-    limit(100)
-  );
+  const plansCollection = collection(db, "wordRooms", room.id, "plans");
+  let plansQuery;
+  if (showAllWordRoomPlans) {
+    const year = wordRoomPlanMonth.getFullYear();
+    const month = wordRoomPlanMonth.getMonth();
+    const monthStart = localDateKey(new Date(year, month, 1));
+    const monthEnd = localDateKey(new Date(year, month + 1, 0));
+    plansQuery = query(
+      plansCollection,
+      where("date", ">=", monthStart),
+      where("date", "<=", monthEnd),
+      orderBy("date", "asc"),
+      limit(50)
+    );
+  } else {
+    plansQuery = query(
+      plansCollection,
+      where("date", "==", getTodayDateKey()),
+      limit(10)
+    );
+  }
   const snapshot = await getDocs(plansQuery);
   wordRoomPlans = snapshot.docs.map((planDocument) => ({
     id: planDocument.id,
@@ -3992,11 +4088,31 @@ async function loadWordRoomPlans(room) {
   document.getElementById("word-room-plan-form-section").hidden = true;
 }
 
-function toggleWordRoomPlans() {
+async function toggleWordRoomPlans() {
   const room = wordRoomCache.get(currentWordRoomId);
   if (!room) return;
   showAllWordRoomPlans = !showAllWordRoomPlans;
-  renderWordRoomPlans(wordRoomPlans, room);
+  if (showAllWordRoomPlans) wordRoomPlanMonth = new Date();
+  try {
+    await loadWordRoomPlans(room);
+  } catch {
+    setMessage("word-room-detail-message", "계획을 불러오지 못했습니다.", "error");
+  }
+}
+
+async function changeWordRoomPlanMonth(offset) {
+  const room = wordRoomCache.get(currentWordRoomId);
+  if (!room || !showAllWordRoomPlans) return;
+  wordRoomPlanMonth = new Date(
+    wordRoomPlanMonth.getFullYear(),
+    wordRoomPlanMonth.getMonth() + offset,
+    1
+  );
+  try {
+    await loadWordRoomPlans(room);
+  } catch {
+    setMessage("word-room-detail-message", "선택한 달의 계획을 불러오지 못했습니다.", "error");
+  }
 }
 
 async function saveWordRoomPlan() {
@@ -4024,6 +4140,7 @@ async function saveWordRoomPlan() {
     }
     resetWordRoomPlanForm();
     showAllWordRoomPlans = true;
+    wordRoomPlanMonth = new Date(date + "T00:00:00");
     await loadWordRoomPlans(room);
     const planLabel = getWordRoomType(room) === "prayer" ? "기도 계획" : "말씀 계획";
     setMessage("word-room-plan-message", wasEditing ? planLabel + "을 수정했습니다." : planLabel + "을 추가했습니다.", "success");
@@ -5069,8 +5186,12 @@ onAuthStateChanged(auth, async (user) => {
     currentUserProfile = null;
     applyFontSize("normal");
     const adminHomeButton = document.getElementById("admin-home-button");
+    const newsAdminHomeButton = document.getElementById("news-admin-home-button");
     if (adminHomeButton) {
       adminHomeButton.hidden = true;
+    }
+    if (newsAdminHomeButton) {
+      newsAdminHomeButton.hidden = true;
     }
     showScreen("login-screen", { historyMode: "replace" });
     return;
@@ -5116,6 +5237,7 @@ window.closeManagementPanel = closeManagementPanel;
 window.openWordRoomCreatePanel = openWordRoomCreatePanel;
 window.closeWordRoomCreatePanel = closeWordRoomCreatePanel;
 window.changeBibleCalendarMonth = changeBibleCalendarMonth;
+window.changeMemoryCalendarMonth = changeMemoryCalendarMonth;
 window.openMemoryCheck = openMemoryCheck;
 window.toggleMemoryCheck = toggleMemoryCheck;
 window.saveMemoryPassage = saveMemoryPassage;
@@ -5148,6 +5270,7 @@ window.resetWordRoomPlanForm = resetWordRoomPlanForm;
 window.saveWordRoomPrayerTopic = saveWordRoomPrayerTopic;
 window.resetWordRoomPrayerTopicForm = resetWordRoomPrayerTopicForm;
 window.toggleWordRoomPlans = toggleWordRoomPlans;
+window.changeWordRoomPlanMonth = changeWordRoomPlanMonth;
 window.showGratitudeTab = showGratitudeTab;
 window.openCommunityGratitudeComposePanel = openCommunityGratitudeComposePanel;
 window.closeCommunityGratitudeComposePanel = closeCommunityGratitudeComposePanel;
