@@ -1678,12 +1678,14 @@
       text-align: center;
     }
 
-    .word-room-invite-form, .word-room-member-list { display: grid; gap: 10px; margin-top: 16px; }
+    .word-room-invite-form { display: grid; gap: 10px; margin-top: 16px; }
+    .word-room-member-list { display: grid; gap: 6px; margin-top: 10px; }
     .word-room-invite-form select { width: 100%; min-height: 50px; padding: 12px 14px; border: 1px solid #DDD3C7; border-radius: 14px; background: #FCFBF8; color: #443C34; font: inherit; }
-    .word-room-member-row { display: grid; gap: 10px; padding: 14px; border: 1px solid #E5DDD2; border-radius: 14px; background: #FCFBF8; }
+    .word-room-member-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 10px; border: 1px solid #E5DDD2; border-radius: 11px; background: #FCFBF8; }
+    .word-room-member-row > div:first-child { min-width: 0; font-size: 14px; }
     .word-room-member-role { display: inline-block; margin-left: 8px; color: #81786D; font-size: 13px; font-weight: 700; }
-    .word-room-member-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .word-room-member-button { min-height: 42px; margin: 0; padding: 8px; font-size: 13px; }
+    .word-room-member-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 5px; }
+    .word-room-member-button { width: auto; min-height: 32px; margin: 0; padding: 5px 8px; border-radius: 9px; font-size: 12px; white-space: nowrap; }
 
     .word-room-plan-form, .word-room-plan-list { display: grid; gap: 10px; margin-top: 16px; }
     .word-room-plan-form label { color: #443C34; font-size: 14px; font-weight: 700; }
@@ -1968,7 +1970,8 @@
       .menu-button { min-height: 104px; padding: 14px 8px; }
       .memory-chunk-button,
       .memory-selected-chunk { width: 100%; justify-content: flex-start; text-align: left; }
-      .word-room-member-actions { grid-template-columns: 1fr; }
+      .word-room-member-row { align-items: flex-start; flex-wrap: wrap; }
+      .word-room-member-actions { margin-left: auto; }
       .community-list-heading { align-items: stretch; flex-direction: column; }
       .compact-compose-button { width: 100%; }
       .prayer-reaction-button,
