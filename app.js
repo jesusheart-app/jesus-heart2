@@ -101,6 +101,12 @@ function showScreen(screenId, options = {}) {
   const activeScreen = document.querySelector(".screen.active");
   const historyMode = options.historyMode || "push";
 
+  document.querySelectorAll(".management-overlay:not([hidden])").forEach((panel) => {
+    panel.hidden = true;
+  });
+  managementPanelReturnFocus = null;
+  syncManagementPanelScrollLock();
+
   document.querySelectorAll(".screen").forEach((screen) => {
     screen.classList.remove("active");
   });
@@ -1405,12 +1411,19 @@ function createPrayerActionButton(label, className, onClick) {
 
 let managementPanelReturnFocus = null;
 
+function syncManagementPanelScrollLock() {
+  const hasOpenPanel = Boolean(
+    document.querySelector(".management-overlay:not([hidden])")
+  );
+  document.body.classList.toggle("management-panel-open", hasOpenPanel);
+}
+
 function openManagementPanel(panelId) {
   const panel = document.getElementById(panelId);
   if (!panel) return;
   managementPanelReturnFocus = document.activeElement;
   panel.hidden = false;
-  document.body.classList.add("management-panel-open");
+  syncManagementPanelScrollLock();
   panel.querySelector(".management-close-button")?.focus();
 }
 
@@ -1419,9 +1432,7 @@ function closeManagementPanel(panelId) {
   if (!panel) return;
   const wasOpen = !panel.hidden;
   panel.hidden = true;
-  if (!document.querySelector(".management-overlay:not([hidden])")) {
-    document.body.classList.remove("management-panel-open");
-  }
+  syncManagementPanelScrollLock();
   if (wasOpen && managementPanelReturnFocus?.isConnected) managementPanelReturnFocus.focus();
   managementPanelReturnFocus = null;
 }
@@ -3721,7 +3732,7 @@ function renderWordRoomMembers(room, members) {
       const actions = document.createElement("div");
       actions.className = "word-room-member-actions";
       actions.append(
-        createPrayerActionButton("방장으로 변경", "secondary-button word-room-member-button", () => transferWordRoomLeadership(member.uid)),
+        createPrayerActionButton("방장 변경", "secondary-button word-room-member-button", () => transferWordRoomLeadership(member.uid)),
         createPrayerActionButton("퇴장", "secondary-button word-room-member-button prayer-delete-button", () => removeWordRoomMember(member.uid))
       );
       row.append(actions);
@@ -3748,7 +3759,7 @@ async function refreshCurrentWordRoom() {
   const inviteSection = document.getElementById("word-room-invite-section");
   const isLeader = room.leaderUid === auth.currentUser.uid;
   document.getElementById("word-room-management-buttons").hidden = !isLeader;
-  inviteSection.hidden = true;
+  closeManagementPanel("word-room-invite-section");
   if (isLeader) {
     const directory = await getDocs(collection(db, "memberDirectory"));
     const candidates = directory.docs.map((item) => item.data())
@@ -4071,7 +4082,7 @@ async function loadWordRoomPlans(room) {
     ...planDocument.data()
   }));
   renderWordRoomPlans(wordRoomPlans, room);
-  document.getElementById("word-room-plan-form-section").hidden = true;
+  closeManagementPanel("word-room-plan-form-section");
 }
 
 async function toggleWordRoomPlans() {
@@ -5201,8 +5212,11 @@ setInterval(setDailyMessage, 60 * 1000);
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") {
     setDailyMessage();
+    syncManagementPanelScrollLock();
   }
 });
+
+window.addEventListener("pageshow", syncManagementPanelScrollLock);
 
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") return;
