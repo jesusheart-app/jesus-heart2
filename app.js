@@ -3717,28 +3717,62 @@ function renderWordRoomMembers(room, members) {
   currentWordRoomMembers = new Map(members.map((member) => [member.uid, member]));
   const list = document.getElementById("word-room-member-list");
   list.replaceChildren();
+
+  const summary = document.createElement("div");
+  summary.className = "word-room-member-summary";
   members.forEach((member) => {
-    const row = document.createElement("article");
-    row.className = "word-room-member-row";
-    const info = document.createElement("div");
-    const name = document.createElement("strong");
+    const nameItem = document.createElement("span");
+    nameItem.className = "word-room-member-name";
+
+    const name = document.createElement("span");
     name.textContent = member.name;
-    const role = document.createElement("span");
-    role.className = "word-room-member-role";
-    role.textContent = member.uid === room.leaderUid ? "방장" : "참여자";
-    info.append(name, role);
-    row.append(info);
-    if (room.leaderUid === auth.currentUser.uid && member.uid !== room.leaderUid) {
-      const actions = document.createElement("div");
-      actions.className = "word-room-member-actions";
-      actions.append(
-        createPrayerActionButton("방장 변경", "secondary-button word-room-member-button", () => transferWordRoomLeadership(member.uid)),
-        createPrayerActionButton("퇴장", "secondary-button word-room-member-button prayer-delete-button", () => removeWordRoomMember(member.uid))
-      );
-      row.append(actions);
+    nameItem.append(name);
+
+    if (member.uid === room.leaderUid) {
+      const role = document.createElement("span");
+      role.className = "word-room-member-role";
+      role.textContent = "방장";
+      nameItem.append(role);
     }
-    list.append(row);
+
+    if (room.leaderUid === auth.currentUser.uid && member.uid !== room.leaderUid) {
+      const removeButton = createPrayerActionButton(
+        "×",
+        "word-room-member-remove-button",
+        () => removeWordRoomMember(member.uid)
+      );
+      removeButton.setAttribute("aria-label", member.name + "님 퇴장");
+      nameItem.append(removeButton);
+    }
+
+    summary.append(nameItem);
   });
+  list.append(summary);
+
+  if (room.leaderUid === auth.currentUser.uid && members.length > 1) {
+    const leadershipControl = document.createElement("div");
+    leadershipControl.className = "word-room-leadership-control";
+
+    const label = document.createElement("label");
+    label.textContent = "방장 변경";
+    const select = document.createElement("select");
+    select.setAttribute("aria-label", "새 방장 선택");
+    members
+      .filter((member) => member.uid !== room.leaderUid)
+      .forEach((member) => {
+        const option = document.createElement("option");
+        option.value = member.uid;
+        option.textContent = member.name;
+        select.append(option);
+      });
+    const changeButton = createPrayerActionButton(
+      "변경",
+      "secondary-button word-room-member-button",
+      () => transferWordRoomLeadership(select.value)
+    );
+    leadershipControl.append(label, select, changeButton);
+    list.append(leadershipControl);
+  }
 }
 
 async function refreshCurrentWordRoom() {
