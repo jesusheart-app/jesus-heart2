@@ -1456,32 +1456,13 @@ function resetPrivatePrayerForm() {
   const prayerDateInput = document.getElementById("private-prayer-date");
   prayerDateInput.max = getTodayDateKey();
   prayerDateInput.value = getTodayDateKey();
-  initializePrayerTimeSelects();
-  document.getElementById("private-prayer-hours").value = "0";
-  document.getElementById("private-prayer-minutes").value = "10";
+  document.getElementById("private-prayer-duration").value = "10";
   document.getElementById("private-prayer-title").value = "";
   document.getElementById("private-prayer-content").value = "";
   document.getElementById("private-prayer-save-button").textContent =
     "기도시간 적립";
   document.getElementById("private-prayer-cancel-button").hidden = true;
   setMessage("private-prayer-message", "");
-}
-
-function initializePrayerTimeSelects() {
-  const hours = document.getElementById("private-prayer-hours");
-  const minutes = document.getElementById("private-prayer-minutes");
-  if (hours.options.length === 0) {
-    for (let value = 0; value <= 12; value += 1) {
-      const option = document.createElement("option");
-      option.value = String(value); option.textContent = value + "시간"; hours.append(option);
-    }
-  }
-  if (minutes.options.length === 0) {
-    for (let value = 0; value < 60; value += 5) {
-      const option = document.createElement("option");
-      option.value = String(value); option.textContent = value + "분"; minutes.append(option);
-    }
-  }
 }
 
 function formatPrayerDuration(totalMinutes) {
@@ -1608,9 +1589,7 @@ async function loadPrivatePrayers() {
 
 async function savePrivatePrayer() {
   const prayerDate = document.getElementById("private-prayer-date").value;
-  const hours = Number(document.getElementById("private-prayer-hours").value);
-  const minutes = Number(document.getElementById("private-prayer-minutes").value);
-  const durationMinutes = hours * 60 + minutes;
+  const durationMinutes = Number(document.getElementById("private-prayer-duration").value);
   const amount = durationMinutes * 10000;
   const titleInput = document.getElementById("private-prayer-title");
   const contentInput = document.getElementById("private-prayer-content");
@@ -1619,7 +1598,8 @@ async function savePrivatePrayer() {
 
   setMessage("private-prayer-message", "");
 
-  if (!prayerDate || prayerDate > getTodayDateKey() || durationMinutes < 1 || durationMinutes > 720) {
+  if (!prayerDate || prayerDate > getTodayDateKey() ||
+      !Number.isInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > 720) {
     setMessage(
       "private-prayer-message",
       "오늘 또는 지난 기도 날짜와 기도 시간을 확인해주세요.",
@@ -1717,14 +1697,10 @@ function editPrivatePrayer(prayerId) {
   }
 
   editingPrivatePrayerId = prayerId;
-  initializePrayerTimeSelects();
   const durationMinutes = Number(prayer.durationMinutes || 0);
   document.getElementById("private-prayer-date").value =
     prayer.prayerDate || getTodayDateKey();
-  document.getElementById("private-prayer-hours").value =
-    String(Math.floor(durationMinutes / 60));
-  document.getElementById("private-prayer-minutes").value =
-    String(durationMinutes % 60);
+  document.getElementById("private-prayer-duration").value = String(durationMinutes);
   document.getElementById("private-prayer-title").value = prayer.title;
   document.getElementById("private-prayer-content").value = prayer.content;
   document.getElementById("private-prayer-save-button").textContent =
@@ -1867,10 +1843,15 @@ async function renderCommunityPrayerReactions(prayer, container) {
   const isAuthor = prayer.uid === auth.currentUser?.uid;
   container.replaceChildren();
   if (isAuthor) {
-    const guide = document.createElement("p");
-    guide.className = "prayer-reaction-guide";
-    guide.textContent = "다른 회원들이 이 기도제목에 함께 마음을 모을 수 있어요.";
-    container.append(guide);
+    communityPrayerReactionTypes.forEach(({ countField, emoji, label }) => {
+      const count = Number(prayer[countField] || 0);
+      const display = document.createElement("span");
+      display.className = "prayer-reaction-count";
+      display.textContent = `${emoji} ${count}`;
+      display.setAttribute("aria-label", `${label} ${count}명`);
+      display.title = `${label} ${count}명`;
+      container.append(display);
+    });
     return;
   }
 
@@ -2931,10 +2912,15 @@ async function renderCommunityGratitudeReactions(
   const isAuthor = gratitude.uid === auth.currentUser?.uid;
   container.replaceChildren();
   if (isAuthor) {
-    const guide = document.createElement("p");
-    guide.className = "prayer-reaction-guide";
-    guide.textContent = "다른 회원들이 이 감사에 함께 마음을 보탤 수 있어요.";
-    container.append(guide);
+    communityGratitudeReactionTypes.forEach(({ countField, emoji, label }) => {
+      const count = Number(gratitude[countField] || 0);
+      const display = document.createElement("span");
+      display.className = "prayer-reaction-count";
+      display.textContent = `${emoji} ${count}`;
+      display.setAttribute("aria-label", `${label} ${count}명`);
+      display.title = `${label} ${count}명`;
+      container.append(display);
+    });
     return;
   }
 

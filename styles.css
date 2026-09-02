@@ -614,6 +614,22 @@
       opacity: 0.58;
     }
 
+    .prayer-reaction-count {
+      min-width: 0;
+      min-height: 38px;
+      flex: 1 1 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 7px 6px;
+      border: 1px solid #E1D9CE;
+      border-radius: 999px;
+      background: #F8F5EF;
+      color: #62594F;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
     .prayer-reaction-guide {
       flex-basis: 100%;
       margin: 2px 0 0 !important;
@@ -706,28 +722,6 @@
     .prayer-comment-submit {
       min-height: 42px;
       margin: 0;
-    }
-
-    .prayer-time-fields {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-
-    .prayer-time-field {
-      display: grid;
-      gap: 7px;
-    }
-
-    .prayer-time-field select {
-      width: 100%;
-      min-height: 48px;
-      padding: 10px 12px;
-      border: 1px solid #DDD3C7;
-      border-radius: 14px;
-      background: #FCFBF8;
-      color: #443C34;
-      font: inherit;
     }
 
     .prayer-bank-summary {
@@ -1295,6 +1289,7 @@
       border: none;
       background: transparent;
 
+      flex: 1;
       min-width: 72px;
       padding: 8px;
 
@@ -1306,6 +1301,23 @@
       display: block;
       margin-bottom: 3px;
       font-size: 22px;
+    }
+
+    .home-nav-button {
+      color: #5F4D3A;
+      font-weight: 800;
+    }
+
+    .home-nav-button .nav-icon {
+      width: 34px;
+      height: 34px;
+      margin: -8px auto 3px;
+      border-radius: 50%;
+      background: #806D55;
+      color: #FFFFFF;
+      font-size: 24px;
+      line-height: 32px;
+      box-shadow: 0 3px 10px rgba(80, 62, 44, 0.18);
     }
 
     /* ========================================

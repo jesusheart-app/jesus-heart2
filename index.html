@@ -432,19 +432,19 @@
 
           <button
             class="nav-button"
-            onclick="showScreen('home-screen')"
-          >
-            <span class="nav-icon">⌂</span>
-            홈
-          </button>
-
-
-          <button
-            class="nav-button"
             onclick="openWordRooms()"
           >
             <span class="nav-icon">🤝</span>
             모임방
+          </button>
+
+
+          <button
+            class="nav-button home-nav-button"
+            onclick="showScreen('home-screen')"
+          >
+            <span class="nav-icon">⌂</span>
+            홈
           </button>
 
 
@@ -696,16 +696,17 @@
               <label for="private-prayer-date">기도 날짜</label>
               <input id="private-prayer-date" type="date">
 
-              <div class="prayer-time-fields">
-                <div>
-                  <label for="private-prayer-hours">시간</label>
-                  <select id="private-prayer-hours"></select>
-                </div>
-                <div>
-                  <label for="private-prayer-minutes">분</label>
-                  <select id="private-prayer-minutes"></select>
-                </div>
-              </div>
+              <label for="private-prayer-duration">기도한 시간 (분)</label>
+              <input
+                id="private-prayer-duration"
+                type="number"
+                min="1"
+                max="720"
+                step="1"
+                inputmode="numeric"
+                value="10"
+                placeholder="예: 10"
+              >
 
               <label for="private-prayer-title">
                 기도 제목 (선택)
