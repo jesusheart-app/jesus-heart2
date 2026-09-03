@@ -1468,8 +1468,6 @@ function resetPrivatePrayerForm() {
   prayerDateInput.max = getTodayDateKey();
   prayerDateInput.value = getTodayDateKey();
   document.getElementById("private-prayer-duration").value = "10";
-  document.getElementById("private-prayer-title").value = "";
-  document.getElementById("private-prayer-content").value = "";
   document.getElementById("private-prayer-save-button").textContent =
     "기도시간 적립";
   document.getElementById("private-prayer-cancel-button").hidden = true;
@@ -1525,27 +1523,14 @@ function renderPrivatePrayers(documents) {
     privatePrayerCache.set(prayer.id, prayer);
 
     const card = document.createElement("article");
-    card.className = "prayer-record-card";
+    card.className = "prayer-record-card prayer-bank-entry";
 
-    const heading = document.createElement("div");
-    heading.className = "prayer-record-heading";
-
-    const title = document.createElement("h3");
-    title.textContent = prayer.title || "기도시간 적립";
-    heading.append(title);
-
-    const status = document.createElement("span");
-    status.className =
-      "prayer-status prayer-status-" + prayer.status;
-    status.textContent =
-      prayer.status === "answered" ? "응답받음" : "기도 중";
-    heading.append(status);
-    card.append(heading);
-
-    const content = document.createElement("p");
-    content.className = "prayer-record-content";
-    content.textContent = prayer.content || "메모 없음";
-    card.append(content);
+    const date = document.createElement("p");
+    date.className = "prayer-record-date";
+    date.textContent = prayer.prayerDate
+      ? new Date(prayer.prayerDate + "T00:00:00").toLocaleDateString("ko-KR")
+      : formatPrayerDate(prayer.createdAt);
+    card.append(date);
 
     if (prayer.durationMinutes) {
       const transaction = document.createElement("div");
@@ -1560,21 +1545,9 @@ function renderPrivatePrayers(documents) {
       card.append(transaction);
     }
 
-    const date = document.createElement("p");
-    date.className = "prayer-record-date";
-    date.textContent = prayer.prayerDate
-      ? new Date(prayer.prayerDate + "T00:00:00").toLocaleDateString("ko-KR")
-      : formatPrayerDate(prayer.createdAt);
-    card.append(date);
-
     const actions = document.createElement("div");
     actions.className = "prayer-record-actions";
     actions.append(
-      createPrayerActionButton(
-        prayer.status === "answered" ? "다시 기도 중" : "응답받음",
-        "secondary-button prayer-small-button",
-        () => togglePrivatePrayerStatus(prayer.id)
-      ),
       createPrayerActionButton(
         "✎ 수정",
         "compact-action-button",
@@ -1602,10 +1575,6 @@ async function savePrivatePrayer() {
   const prayerDate = document.getElementById("private-prayer-date").value;
   const durationMinutes = Number(document.getElementById("private-prayer-duration").value);
   const amount = durationMinutes * 10000;
-  const titleInput = document.getElementById("private-prayer-title");
-  const contentInput = document.getElementById("private-prayer-content");
-  const title = titleInput.value.trim() || "기도시간 적립";
-  const prayerContent = contentInput.value.trim();
 
   setMessage("private-prayer-message", "");
 
@@ -1614,15 +1583,6 @@ async function savePrivatePrayer() {
     setMessage(
       "private-prayer-message",
       "오늘 또는 지난 기도 날짜와 기도 시간을 확인해주세요.",
-      "error"
-    );
-    return;
-  }
-
-  if (title.length > 80 || prayerContent.length > 2000) {
-    setMessage(
-      "private-prayer-message",
-      "기도 제목은 80자, 내용은 2,000자 이내로 입력해주세요.",
       "error"
     );
     return;
@@ -1656,8 +1616,6 @@ async function savePrivatePrayer() {
           prayerDate,
           durationMinutes,
           amount,
-          title,
-          content: prayerContent,
           updatedAt: serverTimestamp()
         }
       );
@@ -1670,8 +1628,8 @@ async function savePrivatePrayer() {
         prayerDate,
         durationMinutes,
         amount,
-        title,
-        content: prayerContent,
+        title: "기도시간 적립",
+        content: "",
         status: "praying",
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -1712,41 +1670,12 @@ function editPrivatePrayer(prayerId) {
   document.getElementById("private-prayer-date").value =
     prayer.prayerDate || getTodayDateKey();
   document.getElementById("private-prayer-duration").value = String(durationMinutes);
-  document.getElementById("private-prayer-title").value = prayer.title;
-  document.getElementById("private-prayer-content").value = prayer.content;
   document.getElementById("private-prayer-save-button").textContent =
     "기도시간 수정";
   document.getElementById("private-prayer-cancel-button").hidden = false;
-  setMessage("private-prayer-message", "수정할 내용을 확인해주세요.");
-  document.getElementById("private-prayer-title").focus();
+  setMessage("private-prayer-message", "수정할 날짜와 시간을 확인해주세요.");
+  document.getElementById("private-prayer-duration").focus();
   window.scrollTo({ top: 0, behavior: "smooth" });
-}
-
-async function togglePrivatePrayerStatus(prayerId) {
-  const prayer = privatePrayerCache.get(prayerId);
-  if (!prayer) {
-    return;
-  }
-
-  const answered = prayer.status !== "answered";
-
-  try {
-    await updateDoc(
-      doc(db, "users", auth.currentUser.uid, "prayers", prayerId),
-      {
-        status: answered ? "answered" : "praying",
-        answeredAt: answered ? serverTimestamp() : null,
-        updatedAt: serverTimestamp()
-      }
-    );
-    await loadPrivatePrayers();
-  } catch {
-    setMessage(
-      "private-prayer-message",
-      "기도 상태를 변경하지 못했습니다.",
-      "error"
-    );
-  }
 }
 
 async function deletePrivatePrayer(prayerId) {

@@ -807,6 +807,10 @@
     .prayer-bank-summary span { display: block; color: #81786D; font-size: 12px; font-weight: 700; }
     .prayer-bank-summary strong { display: block; margin-top: 5px; color: #704F34; font-size: 18px; }
     .prayer-bank-transaction { display: flex; justify-content: space-between; gap: 10px; margin-top: 10px; color: #6D5944; font-size: 13px; font-weight: 750; }
+    .prayer-bank-entry { padding: 13px 14px; }
+    .prayer-bank-entry .prayer-record-date { margin: 0 !important; }
+    .prayer-bank-entry .prayer-bank-transaction { margin-top: 8px; }
+    .prayer-bank-entry .prayer-record-actions { justify-content: flex-end; margin-top: 7px; }
 
     .collapsible-card > summary {
       padding: 18px 20px;
