@@ -643,6 +643,72 @@
       border-top: 1px solid #E8E1D8;
     }
 
+    .prayer-comments[hidden] { display: none; }
+
+    .community-prayer-card,
+    .community-gratitude-card {
+      padding: 14px;
+      border-radius: 15px;
+    }
+
+    .community-prayer-card .prayer-record-content,
+    .community-gratitude-card .gratitude-text {
+      margin-top: 8px !important;
+      line-height: 1.55;
+    }
+
+    .community-content-collapsed {
+      display: -webkit-box;
+      overflow: hidden;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 4;
+    }
+
+    .community-content-toggle,
+    .community-comments-toggle {
+      width: auto;
+      min-height: 30px;
+      margin: 5px 0 0;
+      padding: 4px 2px;
+      border: 0;
+      background: transparent;
+      color: #756654;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .community-comments-toggle {
+      display: block;
+      margin-top: 10px;
+    }
+
+    .community-prayer-card .prayer-comments,
+    .community-gratitude-card .prayer-comments {
+      margin-top: 6px;
+      padding-top: 12px;
+    }
+
+    .community-prayer-card .prayer-reactions,
+    .community-gratitude-card .prayer-reactions {
+      margin-top: 11px;
+      padding-top: 10px;
+    }
+
+    .community-prayer-card .prayer-reaction-button,
+    .community-prayer-card .prayer-reaction-count,
+    .community-gratitude-card .prayer-reaction-button,
+    .community-gratitude-card .prayer-reaction-count {
+      min-height: 34px;
+      padding-top: 5px;
+      padding-bottom: 5px;
+    }
+
+    .community-prayer-card .prayer-record-actions,
+    .community-gratitude-card .prayer-record-actions {
+      margin-top: 8px;
+    }
+
     .prayer-comment-heading {
       margin: 0 0 12px;
       color: #443C34;
@@ -1679,12 +1745,15 @@
     }
 
     .word-room-invite-form { display: grid; gap: 10px; margin-top: 16px; }
-    .word-room-member-list { display: grid; gap: 6px; margin-top: 10px; }
+    .word-room-member-list { display: grid; gap: 9px; margin-top: 10px; }
     .word-room-invite-form select { width: 100%; min-height: 50px; padding: 12px 14px; border: 1px solid #DDD3C7; border-radius: 14px; background: #FCFBF8; color: #443C34; font: inherit; }
-    .word-room-member-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 10px; border: 1px solid #E5DDD2; border-radius: 11px; background: #FCFBF8; }
-    .word-room-member-row > div:first-child { min-width: 0; font-size: 14px; }
-    .word-room-member-role { display: inline-block; margin-left: 8px; color: #81786D; font-size: 13px; font-weight: 700; }
-    .word-room-member-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 5px; }
+    .word-room-member-summary { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 11px 12px; border: 1px solid #E5DDD2; border-radius: 11px; background: #FCFBF8; }
+    .word-room-member-name { display: inline-flex; align-items: center; gap: 4px; color: #443C34; font-size: 14px; font-weight: 700; }
+    .word-room-member-role { display: inline-block; margin-left: 2px; color: #81786D; font-size: 11px; font-weight: 700; }
+    .word-room-member-remove-button { width: 22px; height: 22px; padding: 0; border: 0; background: transparent; color: #A25F59; font-size: 16px; line-height: 1; }
+    .word-room-leadership-control { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+    .word-room-leadership-control label { color: #81786D; font-size: 12px; font-weight: 700; }
+    .word-room-leadership-control select { width: auto; max-width: 130px; min-height: 32px; padding: 4px 24px 4px 8px; border: 1px solid #DDD3C7; border-radius: 9px; background: #FCFBF8; color: #443C34; font: inherit; font-size: 12px; }
     .word-room-member-button { width: auto; min-height: 32px; margin: 0; padding: 5px 8px; border-radius: 9px; font-size: 12px; white-space: nowrap; }
 
     .word-room-plan-form, .word-room-plan-list { display: grid; gap: 10px; margin-top: 16px; }
@@ -1970,8 +2039,7 @@
       .menu-button { min-height: 104px; padding: 14px 8px; }
       .memory-chunk-button,
       .memory-selected-chunk { width: 100%; justify-content: flex-start; text-align: left; }
-      .word-room-member-row { align-items: flex-start; flex-wrap: wrap; }
-      .word-room-member-actions { margin-left: auto; }
+      .word-room-leadership-control { flex-wrap: wrap; }
       .community-list-heading { align-items: stretch; flex-direction: column; }
       .compact-compose-button { width: 100%; }
       .prayer-reaction-button,
