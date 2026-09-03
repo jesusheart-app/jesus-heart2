@@ -643,6 +643,72 @@
       border-top: 1px solid #E8E1D8;
     }
 
+    .prayer-comments[hidden] { display: none; }
+
+    .community-prayer-card,
+    .community-gratitude-card {
+      padding: 14px;
+      border-radius: 15px;
+    }
+
+    .community-prayer-card .prayer-record-content,
+    .community-gratitude-card .gratitude-text {
+      margin-top: 8px !important;
+      line-height: 1.55;
+    }
+
+    .community-content-collapsed {
+      display: -webkit-box;
+      overflow: hidden;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 4;
+    }
+
+    .community-content-toggle,
+    .community-comments-toggle {
+      width: auto;
+      min-height: 30px;
+      margin: 5px 0 0;
+      padding: 4px 2px;
+      border: 0;
+      background: transparent;
+      color: #756654;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .community-comments-toggle {
+      display: block;
+      margin-top: 10px;
+    }
+
+    .community-prayer-card .prayer-comments,
+    .community-gratitude-card .prayer-comments {
+      margin-top: 6px;
+      padding-top: 12px;
+    }
+
+    .community-prayer-card .prayer-reactions,
+    .community-gratitude-card .prayer-reactions {
+      margin-top: 11px;
+      padding-top: 10px;
+    }
+
+    .community-prayer-card .prayer-reaction-button,
+    .community-prayer-card .prayer-reaction-count,
+    .community-gratitude-card .prayer-reaction-button,
+    .community-gratitude-card .prayer-reaction-count {
+      min-height: 34px;
+      padding-top: 5px;
+      padding-bottom: 5px;
+    }
+
+    .community-prayer-card .prayer-record-actions,
+    .community-gratitude-card .prayer-record-actions {
+      margin-top: 8px;
+    }
+
     .prayer-comment-heading {
       margin: 0 0 12px;
       color: #443C34;

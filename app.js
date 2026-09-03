@@ -2009,6 +2009,11 @@ async function renderCommunityPrayerComments(prayer, container) {
     heading.className = "prayer-comment-heading";
     heading.textContent = "댓글 " + snapshot.size;
     container.append(heading);
+    container.dataset.commentCount = String(snapshot.size);
+    const toggle = container.previousElementSibling;
+    if (toggle?.classList.contains("community-comments-toggle")) {
+      toggle.textContent = "댓글 " + snapshot.size + " 닫기";
+    }
 
     const list = document.createElement("div");
     list.className = "prayer-comment-list";
@@ -2080,6 +2085,62 @@ async function renderCommunityPrayerComments(prayer, container) {
   }
 }
 
+function appendExpandableCommunityText(card, element, content) {
+  element.textContent = content;
+  card.append(element);
+  if (content.length <= 120) return;
+
+  element.classList.add("community-content-collapsed");
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "community-content-toggle";
+  button.textContent = "더보기";
+  button.addEventListener("click", () => {
+    const willExpand = element.classList.contains("community-content-collapsed");
+    element.classList.toggle("community-content-collapsed", !willExpand);
+    button.textContent = willExpand ? "접기" : "더보기";
+  });
+  card.append(button);
+}
+
+function appendCollapsibleCommunityComments(card, renderComments) {
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.className = "community-comments-toggle";
+  toggle.textContent = "댓글 보기";
+  toggle.setAttribute("aria-expanded", "false");
+
+  const comments = document.createElement("div");
+  comments.className = "prayer-comments";
+  comments.hidden = true;
+  let loaded = false;
+
+  toggle.addEventListener("click", async () => {
+    const willOpen = comments.hidden;
+    comments.hidden = !willOpen;
+    toggle.setAttribute("aria-expanded", willOpen ? "true" : "false");
+
+    if (!willOpen) {
+      const count = comments.dataset.commentCount;
+      toggle.textContent = count == null ? "댓글 보기" : "댓글 " + count + " 보기";
+      return;
+    }
+
+    if (!loaded) {
+      toggle.disabled = true;
+      toggle.textContent = "댓글 불러오는 중...";
+      await renderComments(comments);
+      loaded = true;
+      toggle.disabled = false;
+    } else {
+      const count = comments.dataset.commentCount;
+      toggle.textContent = count == null ? "댓글 닫기" : "댓글 " + count + " 닫기";
+    }
+  });
+
+  card.append(toggle, comments);
+}
+
 function renderCommunityPrayers(documents) {
   const list = document.getElementById("community-prayer-list");
   list.replaceChildren();
@@ -2115,8 +2176,7 @@ function renderCommunityPrayers(documents) {
 
     const prayerContent = document.createElement("p");
     prayerContent.className = "prayer-record-content";
-    prayerContent.textContent = prayer.content;
-    card.append(prayerContent);
+    appendExpandableCommunityText(card, prayerContent, prayer.content);
 
     if (prayer.uid === auth.currentUser?.uid) {
       const actions = document.createElement("div");
@@ -2142,10 +2202,10 @@ function renderCommunityPrayers(documents) {
 
     renderCommunityPrayerReactions(prayer, reactions);
 
-    const comments = document.createElement("div");
-    comments.className = "prayer-comments";
-    card.append(comments);
-    renderCommunityPrayerComments(prayer, comments);
+    appendCollapsibleCommunityComments(
+      card,
+      (comments) => renderCommunityPrayerComments(prayer, comments)
+    );
 
     list.append(card);
   });
@@ -3098,6 +3158,11 @@ async function renderCommunityGratitudeComments(
     heading.className = "prayer-comment-heading";
     heading.textContent = "댓글 " + snapshot.size;
     container.append(heading);
+    container.dataset.commentCount = String(snapshot.size);
+    const toggle = container.previousElementSibling;
+    if (toggle?.classList.contains("community-comments-toggle")) {
+      toggle.textContent = "댓글 " + snapshot.size + " 닫기";
+    }
 
     const list = document.createElement("div");
     list.className = "prayer-comment-list";
@@ -3210,8 +3275,7 @@ function renderCommunityGratitudes(documents) {
 
     const content = document.createElement("p");
     content.className = "gratitude-text";
-    content.textContent = gratitude.content;
-    card.append(content);
+    appendExpandableCommunityText(card, content, gratitude.content);
 
     if (gratitude.uid === auth.currentUser?.uid) {
       const actions = document.createElement("div");
@@ -3236,10 +3300,10 @@ function renderCommunityGratitudes(documents) {
     card.append(reactions);
     renderCommunityGratitudeReactions(gratitude, reactions);
 
-    const comments = document.createElement("div");
-    comments.className = "prayer-comments";
-    card.append(comments);
-    renderCommunityGratitudeComments(gratitude, comments);
+    appendCollapsibleCommunityComments(
+      card,
+      (comments) => renderCommunityGratitudeComments(gratitude, comments)
+    );
 
     list.append(card);
   });
