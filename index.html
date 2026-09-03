@@ -879,6 +879,41 @@
             이곳의 기록은 본인만 볼 수 있습니다.
           </p>
 
+          <button
+            id="word-note-open-button"
+            class="primary-button"
+            type="button"
+            onclick="openWordNoteFormPanel()"
+          >
+            + 말씀노트 작성
+          </button>
+
+        </div>
+
+
+        <div class="page-card">
+
+          <h2>지난 말씀노트</h2>
+
+          <div
+            id="word-note-list"
+            class="word-note-list"
+          ></div>
+
+        </div>
+
+
+        <div id="word-note-form-section" class="management-overlay" role="dialog" aria-modal="true" aria-labelledby="word-note-form-title" hidden>
+
+          <div class="management-panel">
+
+            <div class="management-panel-header">
+              <h2 id="word-note-form-title">말씀노트 작성</h2>
+              <button class="management-close-button" type="button" onclick="closeWordNoteFormPanel()" aria-label="닫기">×</button>
+            </div>
+
+            <div class="management-panel-content">
+
           <div class="word-note-form">
 
             <label for="word-note-date">기록 날짜</label>
@@ -916,7 +951,7 @@
               id="word-note-cancel-button"
               class="secondary-button word-note-cancel-button"
               type="button"
-              onclick="resetWordNoteForm()"
+              onclick="closeWordNoteFormPanel()"
               hidden
             >
               수정 취소
@@ -930,17 +965,9 @@
 
           </div>
 
-        </div>
+            </div>
 
-
-        <div class="page-card">
-
-          <h2>지난 말씀노트</h2>
-
-          <div
-            id="word-note-list"
-            class="word-note-list"
-          ></div>
+          </div>
 
         </div>
 
