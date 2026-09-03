@@ -2353,6 +2353,17 @@ function resetWordNoteForm() {
   setMessage("word-note-message", "");
 }
 
+function openWordNoteFormPanel() {
+  resetWordNoteForm();
+  document.getElementById("word-note-form-title").textContent = "말씀노트 작성";
+  openManagementPanel("word-note-form-section");
+}
+
+function closeWordNoteFormPanel() {
+  resetWordNoteForm();
+  closeManagementPanel("word-note-form-section");
+}
+
 function renderWordNotes(documents) {
   const list = document.getElementById("word-note-list");
   list.replaceChildren();
@@ -2366,8 +2377,16 @@ function renderWordNotes(documents) {
     return;
   }
 
-  documents.forEach((noteDocument) => {
-    const note = { id: noteDocument.id, ...noteDocument.data() };
+  const notes = documents
+    .map((noteDocument) => ({ id: noteDocument.id, ...noteDocument.data() }))
+    .sort((first, second) => {
+      if (first.date !== second.date) return second.date.localeCompare(first.date);
+      const firstTime = first.createdAt?.toMillis?.() || first.updatedAt?.toMillis?.() || 0;
+      const secondTime = second.createdAt?.toMillis?.() || second.updatedAt?.toMillis?.() || 0;
+      return secondTime - firstTime;
+    });
+
+  notes.forEach((note) => {
     wordNoteCache.set(note.id, note);
 
     const card = document.createElement("article");
@@ -2494,6 +2513,7 @@ async function saveWordNote() {
 
     resetWordNoteForm();
     await loadWordNotes();
+    closeManagementPanel("word-note-form-section");
     setMessage(
       "word-note-message",
       wasEditing
@@ -2528,10 +2548,11 @@ function editWordNote(noteId) {
   document.getElementById("word-note-content").value = note.content;
   document.getElementById("word-note-save-button").textContent =
     "말씀노트 수정";
+  document.getElementById("word-note-form-title").textContent = "말씀노트 수정";
   document.getElementById("word-note-cancel-button").hidden = false;
   setMessage("word-note-message", "수정할 내용을 확인해주세요.");
+  openManagementPanel("word-note-form-section");
   document.getElementById("word-note-content").focus();
-  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 async function deleteWordNote(noteId) {
@@ -5306,6 +5327,8 @@ window.resetPrivateGratitudeForm = resetPrivateGratitudeForm;
 window.saveCommunityGratitude = saveCommunityGratitude;
 window.resetCommunityGratitudeForm = resetCommunityGratitudeForm;
 window.saveWordNote = saveWordNote;
+window.openWordNoteFormPanel = openWordNoteFormPanel;
+window.closeWordNoteFormPanel = closeWordNoteFormPanel;
 window.resetWordNoteForm = resetWordNoteForm;
 window.showPrayerTab = showPrayerTab;
 window.openCommunityPrayerComposePanel = openCommunityPrayerComposePanel;
