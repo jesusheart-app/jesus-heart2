@@ -1596,6 +1596,37 @@
       margin-top: 18px;
     }
 
+    .community-gratitude-date-controls {
+      display: grid;
+      grid-template-columns: 40px 1fr 40px;
+      align-items: center;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .community-gratitude-date-controls button {
+      min-height: 40px;
+      border: 1px solid #DDD3C7;
+      border-radius: 12px;
+      background: #FCFBF8;
+      color: #62594F;
+      font: inherit;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .community-gratitude-date-controls button:disabled {
+      opacity: 0.35;
+      cursor: default;
+    }
+
+    .community-gratitude-date-controls .community-gratitude-date-title {
+      border-color: #CDBEA9;
+      background: #F4EDE2;
+      color: #443C34;
+      font-size: 14px;
+    }
+
     .gratitude-card {
       padding: 18px;
       border: 1px solid #E5DDD2;

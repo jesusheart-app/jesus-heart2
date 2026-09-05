@@ -1104,6 +1104,11 @@
               <h2>함께 감사해요</h2>
               <button class="primary-button compact-compose-button" type="button" onclick="openCommunityGratitudeComposePanel()">＋ 감사 나누기</button>
             </div>
+            <div class="community-gratitude-date-controls" aria-label="감사 날짜 선택">
+              <button type="button" onclick="changeCommunityGratitudeDate(-1)" aria-label="이전 날짜">‹</button>
+              <button id="community-gratitude-date-title" class="community-gratitude-date-title" type="button" onclick="showTodayCommunityGratitudes()">오늘의 감사</button>
+              <button id="community-gratitude-next-date" type="button" onclick="changeCommunityGratitudeDate(1)" aria-label="다음 날짜" disabled>›</button>
+            </div>
             <div id="community-gratitude-list-message" class="start-message" aria-live="polite"></div>
             <div id="community-gratitude-list" class="gratitude-list"></div>
           </div>
