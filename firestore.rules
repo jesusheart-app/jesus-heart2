@@ -277,6 +277,16 @@ service cloud.firestore {
       allow delete: if isOwner(uid);
     }
 
+    match /users/{uid}/wordRoomReads/{roomId} {
+      allow read: if isOwner(uid);
+      allow create, update: if isOwner(uid)
+        && isWordRoomMember(roomId)
+        && request.resource.data.keys().hasOnly(['roomId', 'lastReadAt'])
+        && request.resource.data.roomId == roomId
+        && request.resource.data.lastReadAt == request.time;
+      allow delete: if isOwner(uid) || isApprovedAdmin();
+    }
+
     match /users/{uid}/memoryChecks/{dateKey} {
       allow read: if isOwner(uid);
 
@@ -1060,6 +1070,28 @@ service cloud.firestore {
             getAfter(/databases/$(database)/documents/wordRooms/$(roomId)).data.leaderUid != uid
             && !getAfter(/databases/$(database)/documents/wordRooms/$(roomId)).data.memberUids.hasAny([uid])
           )
+        );
+    }
+
+    match /wordRooms/{roomId}/activities/{activityId} {
+      allow read: if isWordRoomMember(roomId);
+      allow create: if isWordRoomMember(roomId)
+        && request.resource.data.keys().hasOnly(['uid', 'type', 'createdAt'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.type in [
+          'plan',
+          'planComment',
+          'prayerTopic',
+          'prayerComment'
+        ]
+        && request.resource.data.createdAt == request.time;
+      allow update: if false;
+      allow delete: if isApprovedMember()
+        && (
+          !existsAfter(/databases/$(database)/documents/wordRooms/$(roomId))
+          || get(/databases/$(database)/documents/wordRooms/$(roomId)).data.leaderUid
+            == request.auth.uid
+          || isApprovedAdmin()
         );
     }
 

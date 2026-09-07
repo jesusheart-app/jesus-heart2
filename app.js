@@ -3533,6 +3533,53 @@ function formatWordRoomMemberCount(room) {
   return "참여자 " + count + "명";
 }
 
+async function loadWordRoomUnreadCount(room, badge) {
+  try {
+    const [readSnapshot, activitySnapshot] = await Promise.all([
+      getDoc(doc(db, "users", auth.currentUser.uid, "wordRoomReads", room.id)),
+      getDocs(query(
+        collection(db, "wordRooms", room.id, "activities"),
+        orderBy("createdAt", "desc"),
+        limit(50)
+      ))
+    ]);
+    const lastReadTime = readSnapshot.exists()
+      ? readSnapshot.data().lastReadAt?.toMillis?.() || 0
+      : 0;
+    const unreadCount = activitySnapshot.docs.reduce((count, activityDocument) => {
+      const activity = activityDocument.data();
+      const activityTime = activity.createdAt?.toMillis?.() || 0;
+      return count + (
+        activity.uid !== auth.currentUser.uid && activityTime > lastReadTime
+          ? 1
+          : 0
+      );
+    }, 0);
+
+    badge.hidden = unreadCount === 0;
+    badge.textContent = unreadCount >= 50 ? "새 글 50+" : "새 글 " + unreadCount;
+  } catch {
+    badge.hidden = true;
+  }
+}
+
+async function markWordRoomAsRead(roomId) {
+  await setDoc(
+    doc(db, "users", auth.currentUser.uid, "wordRoomReads", roomId),
+    { roomId, lastReadAt: serverTimestamp() },
+    { merge: true }
+  );
+}
+
+function addWordRoomActivity(batch, roomId, type) {
+  const activityReference = doc(collection(db, "wordRooms", roomId, "activities"));
+  batch.set(activityReference, {
+    uid: auth.currentUser.uid,
+    type,
+    createdAt: serverTimestamp()
+  });
+}
+
 function renderWordRooms(documents) {
   const list = document.getElementById("word-room-list");
   list.replaceChildren();
@@ -3565,11 +3612,17 @@ function renderWordRooms(documents) {
 
     const name = document.createElement("h3");
     name.textContent = room.name;
+    const heading = document.createElement("div");
+    heading.className = "word-room-card-heading";
+    const unreadBadge = document.createElement("span");
+    unreadBadge.className = "word-room-unread-badge";
+    unreadBadge.hidden = true;
+    heading.append(name, unreadBadge);
     const badge = document.createElement("span");
     badge.className = "word-room-type-badge";
     badge.dataset.type = getWordRoomType(room);
     badge.textContent = getWordRoomTypeLabel(room);
-    card.append(badge, name);
+    card.append(badge, heading);
 
     const description = document.createElement("p");
     description.className = "word-room-description";
@@ -3611,6 +3664,7 @@ function renderWordRooms(documents) {
 
     card.append(actions);
     list.append(card);
+    loadWordRoomUnreadCount(room, unreadBadge);
   });
 }
 
@@ -3750,6 +3804,9 @@ async function deleteWordRoom(roomId) {
     const plansSnapshot = await getDocs(
       collection(db, "wordRooms", roomId, "plans")
     );
+    const activitiesSnapshot = await getDocs(
+      collection(db, "wordRooms", roomId, "activities")
+    );
     const planDescendants = [];
     for (const plan of plansSnapshot.docs) {
       const comments = await getDocs(collection(db, "wordRooms", roomId, "plans", plan.id, "comments"));
@@ -3764,6 +3821,9 @@ async function deleteWordRoom(roomId) {
       batch.delete(planDocument.ref);
     });
     planDescendants.forEach((reference) => batch.delete(reference));
+    activitiesSnapshot.docs.forEach((activityDocument) => {
+      batch.delete(activityDocument.ref);
+    });
     batch.delete(roomReference);
     await batch.commit();
 
@@ -3945,6 +4005,7 @@ async function leaveWordRoom() {
     updatedAt: serverTimestamp()
   });
   batch.delete(doc(db, "wordRooms", room.id, "members", auth.currentUser.uid));
+  batch.delete(doc(db, "users", auth.currentUser.uid, "wordRoomReads", room.id));
 
   try {
     await batch.commit();
@@ -4093,7 +4154,8 @@ async function saveWordRoomPlanComment(room, plan, textarea, container) {
   const content = textarea.value.trim();
   if (!content || content.length > 1000) return;
   try {
-    await setDoc(doc(collection(db, "wordRooms", room.id, "plans", plan.id, "comments")), {
+    const batch = writeBatch(db);
+    batch.set(doc(collection(db, "wordRooms", room.id, "plans", plan.id, "comments")), {
       uid: auth.currentUser.uid,
       authorDisplay: currentUserProfile.name,
       content,
@@ -4101,6 +4163,8 @@ async function saveWordRoomPlanComment(room, plan, textarea, container) {
       reactionGraceCount: 0,
       createdAt: serverTimestamp()
     });
+    addWordRoomActivity(batch, room.id, "planComment");
+    await batch.commit();
     textarea.value = "";
     await renderWordRoomPlanComments(room, plan, container);
   } catch { setMessage("word-room-detail-message", "나눔을 저장하지 못했습니다.", "error"); }
@@ -4232,10 +4296,13 @@ async function saveWordRoomPlan() {
         date, passage, note, updatedAt: serverTimestamp()
       });
     } else {
-      await setDoc(doc(collection(db, "wordRooms", room.id, "plans")), {
+      const batch = writeBatch(db);
+      batch.set(doc(collection(db, "wordRooms", room.id, "plans")), {
         date, passage, note, createdBy: auth.currentUser.uid,
         createdAt: serverTimestamp(), updatedAt: serverTimestamp()
       });
+      addWordRoomActivity(batch, room.id, "plan");
+      await batch.commit();
     }
     resetWordRoomPlanForm();
     showAllWordRoomPlans = true;
@@ -4308,7 +4375,8 @@ async function saveWordRoomPrayerTopic() {
         date, title, content, updatedAt: serverTimestamp()
       });
     } else {
-      await setDoc(doc(collection(db, "wordRooms", room.id, "prayerTopics")), {
+      const batch = writeBatch(db);
+      batch.set(doc(collection(db, "wordRooms", room.id, "prayerTopics")), {
         uid: auth.currentUser.uid,
         authorDisplay: currentUserProfile.name,
         date, title, content,
@@ -4317,6 +4385,8 @@ async function saveWordRoomPrayerTopic() {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       });
+      addWordRoomActivity(batch, room.id, "prayerTopic");
+      await batch.commit();
     }
     resetWordRoomPrayerTopicForm();
     await loadWordRoomPrayerTopics(room);
@@ -4372,9 +4442,12 @@ async function saveWordRoomPrayerTopicComment(room, topic, textarea, comments) {
   const content = textarea.value.trim();
   if (!content || content.length > 500) return;
   try {
-    await setDoc(doc(collection(db, "wordRooms", room.id, "prayerTopics", topic.id, "comments")), {
+    const batch = writeBatch(db);
+    batch.set(doc(collection(db, "wordRooms", room.id, "prayerTopics", topic.id, "comments")), {
       uid: auth.currentUser.uid, authorDisplay: currentUserProfile.name, content, createdAt: serverTimestamp()
     });
+    addWordRoomActivity(batch, room.id, "prayerComment");
+    await batch.commit();
     textarea.value = "";
     await renderWordRoomPrayerTopicComments(room, topic, comments);
   } catch { setMessage("word-room-detail-message", "댓글을 저장하지 못했습니다.", "error"); }
@@ -4478,6 +4551,7 @@ async function openWordRoom(roomId) {
       resetWordRoomPrayerTopicForm();
       await loadWordRoomPrayerTopics(refreshedRoom);
     }
+    await markWordRoomAsRead(roomId);
     setMessage("word-room-detail-message", "");
   } catch { setMessage("word-room-detail-message", "참여자 목록을 불러오지 못했습니다.", "error"); }
 }

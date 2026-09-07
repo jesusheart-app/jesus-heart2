@@ -1743,6 +1743,26 @@
       color: #443C34;
     }
 
+    .word-room-card-heading {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .word-room-unread-badge {
+      flex: 0 0 auto;
+      padding: 5px 9px;
+      border-radius: 999px;
+      background: #9A604F;
+      color: #FFFFFF;
+      font-size: 12px;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .word-room-unread-badge[hidden] { display: none; }
+
     .word-room-description {
       margin: 0 0 10px !important;
       color: #51483F !important;
