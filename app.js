@@ -50,7 +50,6 @@ let wordNoteCache = new Map();
 let editingWordNoteId = null;
 let privateGratitudeCache = new Map();
 let communityGratitudeCache = new Map();
-let communityGratitudeDate = new Date();
 let editingPrivateGratitudeId = null;
 let editingCommunityGratitudeId = null;
 let wordRoomCache = new Map();
@@ -3202,9 +3201,7 @@ function renderCommunityGratitudes(documents) {
   if (documents.length === 0) {
     const empty = document.createElement("p");
     empty.className = "gratitude-empty";
-    empty.textContent = localDateKey(communityGratitudeDate) === getTodayDateKey()
-      ? "오늘 나눈 감사가 아직 없습니다."
-      : "이 날짜에 나눈 감사가 없습니다.";
+    empty.textContent = "아직 함께 나눈 감사가 없습니다.";
     list.append(empty);
     return;
   }
@@ -3263,62 +3260,13 @@ function renderCommunityGratitudes(documents) {
 }
 
 async function loadCommunityGratitudes() {
-  const selectedDate = new Date(
-    communityGratitudeDate.getFullYear(),
-    communityGratitudeDate.getMonth(),
-    communityGratitudeDate.getDate()
-  );
-  const nextDate = new Date(selectedDate);
-  nextDate.setDate(nextDate.getDate() + 1);
-
   const gratitudeQuery = query(
     collection(db, "communityGratitudes"),
-    where("createdAt", ">=", selectedDate),
-    where("createdAt", "<", nextDate),
     orderBy("createdAt", "desc"),
-    limit(50)
+    limit(20)
   );
   const snapshot = await getDocs(gratitudeQuery);
-  updateCommunityGratitudeDateControls();
   renderCommunityGratitudes(snapshot.docs);
-}
-
-function updateCommunityGratitudeDateControls() {
-  const title = document.getElementById("community-gratitude-date-title");
-  const nextButton = document.getElementById("community-gratitude-next-date");
-  if (!title || !nextButton) return;
-
-  const selectedKey = localDateKey(communityGratitudeDate);
-  const todayKey = getTodayDateKey();
-  title.textContent = selectedKey === todayKey
-    ? "오늘의 감사"
-    : communityGratitudeDate.toLocaleDateString("ko-KR", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-        weekday: "short"
-      });
-  nextButton.disabled = selectedKey >= todayKey;
-}
-
-async function changeCommunityGratitudeDate(offset) {
-  const nextDate = new Date(communityGratitudeDate);
-  nextDate.setDate(nextDate.getDate() + offset);
-  if (localDateKey(nextDate) > getTodayDateKey()) return;
-
-  communityGratitudeDate = nextDate;
-  setMessage("community-gratitude-list-message", "감사 나눔을 불러오는 중입니다.");
-  try {
-    await loadCommunityGratitudes();
-    setMessage("community-gratitude-list-message", "");
-  } catch {
-    setMessage("community-gratitude-list-message", "감사 나눔을 불러오지 못했습니다.", "error");
-  }
-}
-
-async function showTodayCommunityGratitudes() {
-  communityGratitudeDate = new Date();
-  await changeCommunityGratitudeDate(0);
 }
 
 async function saveCommunityGratitude() {
@@ -3375,7 +3323,6 @@ async function saveCommunityGratitude() {
 
     resetCommunityGratitudeForm();
     closeManagementPanel("community-gratitude-compose-panel");
-    if (!wasEditing) communityGratitudeDate = new Date();
     await loadCommunityGratitudes();
     setMessage(
       "community-gratitude-list-message",
@@ -3474,7 +3421,6 @@ async function openGratitude() {
   }
 
   showScreen("thanks-screen");
-  communityGratitudeDate = new Date();
   showGratitudeTab("private");
   resetPrivateGratitudeForm();
   resetCommunityGratitudeForm();
@@ -5448,8 +5394,6 @@ window.resetWordRoomPrayerTopicForm = resetWordRoomPrayerTopicForm;
 window.toggleWordRoomPlans = toggleWordRoomPlans;
 window.changeWordRoomPlanMonth = changeWordRoomPlanMonth;
 window.showGratitudeTab = showGratitudeTab;
-window.changeCommunityGratitudeDate = changeCommunityGratitudeDate;
-window.showTodayCommunityGratitudes = showTodayCommunityGratitudes;
 window.openCommunityGratitudeComposePanel = openCommunityGratitudeComposePanel;
 window.closeCommunityGratitudeComposePanel = closeCommunityGratitudeComposePanel;
 window.savePrivateGratitude = savePrivateGratitude;
