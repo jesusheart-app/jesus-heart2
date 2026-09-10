@@ -3730,6 +3730,14 @@ function editWordRoom(roomId) {
   document.getElementById("word-room-name").focus();
 }
 
+async function editCurrentWordRoom() {
+  const roomId = currentWordRoomId;
+  const room = wordRoomCache.get(roomId);
+  if (!room || !canManageWordRoom(room)) return;
+  await openWordRooms();
+  editWordRoom(roomId);
+}
+
 async function deleteWordRoom(roomId) {
   const room = wordRoomCache.get(roomId);
   if (
@@ -5400,6 +5408,7 @@ window.openMyPage = openMyPage;
 window.saveMyPageSettings = saveMyPageSettings;
 window.toggleDailyNotifications = toggleDailyNotifications;
 window.openWordRoom = openWordRoom;
+window.editCurrentWordRoom = editCurrentWordRoom;
 window.saveWordRoom = saveWordRoom;
 window.resetWordRoomForm = resetWordRoomForm;
 window.inviteWordRoomMember = inviteWordRoomMember;
