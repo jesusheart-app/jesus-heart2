@@ -61,6 +61,7 @@ let editingWordRoomPlanId = null;
 let wordRoomPlans = [];
 let showAllWordRoomPlans = false;
 let wordRoomPlanMonth = new Date();
+const WORD_ROOM_PLAN_NOTE_MAX_LENGTH = 3000;
 let memoryPassage = null;
 let memoryChunks = [];
 let memoryAvailableChunks = [];
@@ -3967,9 +3968,17 @@ function resetWordRoomPlanForm() {
   document.getElementById("word-room-plan-date").value = "";
   document.getElementById("word-room-plan-passage").value = "";
   document.getElementById("word-room-plan-note").value = "";
+  updateWordRoomPlanNoteCount();
   document.getElementById("word-room-plan-save-button").textContent = isPrayer ? "기도 계획 추가" : "말씀 계획 추가";
   document.getElementById("word-room-plan-cancel-button").hidden = true;
   setMessage("word-room-plan-message", "");
+}
+
+function updateWordRoomPlanNoteCount() {
+  const note = document.getElementById("word-room-plan-note");
+  const count = document.getElementById("word-room-plan-note-count");
+  if (!note || !count) return;
+  count.textContent = `${note.value.length.toLocaleString("ko-KR")} / ${WORD_ROOM_PLAN_NOTE_MAX_LENGTH.toLocaleString("ko-KR")}자`;
 }
 
 function applyWordRoomTypeCopy(room) {
@@ -4227,7 +4236,7 @@ async function saveWordRoomPlan() {
   const passage = document.getElementById("word-room-plan-passage").value.trim();
   const note = document.getElementById("word-room-plan-note").value.trim();
   if (!room || room.leaderUid !== auth.currentUser.uid || !date ||
-      !passage || passage.length > 120 || note.length > 500) {
+      !passage || passage.length > 120 || note.length > WORD_ROOM_PLAN_NOTE_MAX_LENGTH) {
     setMessage("word-room-plan-message", getWordRoomType(room) === "prayer" ? "날짜와 기도 내용을 확인해주세요." : "날짜와 읽을 말씀을 확인해주세요.", "error");
     return;
   }
@@ -4266,6 +4275,7 @@ function editWordRoomPlan(planId) {
   document.getElementById("word-room-plan-date").value = plan.date;
   document.getElementById("word-room-plan-passage").value = plan.passage;
   document.getElementById("word-room-plan-note").value = plan.note || "";
+  updateWordRoomPlanNoteCount();
   document.getElementById("word-room-plan-save-button").textContent = getWordRoomType(room) === "prayer" ? "기도 계획 수정" : "말씀 계획 수정";
   document.getElementById("word-room-plan-cancel-button").hidden = false;
   openManagementPanel("word-room-plan-form-section");
@@ -5270,6 +5280,10 @@ document.getElementById("login-password").addEventListener("keydown", (event) =>
     login();
   }
 });
+
+document
+  .getElementById("word-room-plan-note")
+  .addEventListener("input", updateWordRoomPlanNoteCount);
 
 document
   .getElementById("bible-check-date")
