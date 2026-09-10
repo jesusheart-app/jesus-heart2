@@ -145,7 +145,7 @@ function getSafeHistoryScreen(requestedScreenId) {
 
   if (
     !screenExists ||
-    ["login-screen", "signup-screen", "pending-screen"].includes(
+    ["startup-screen", "login-screen", "signup-screen", "pending-screen"].includes(
       requestedScreenId
     )
   ) {
@@ -180,7 +180,7 @@ window.addEventListener("popstate", (event) => {
 });
 
 history.replaceState(
-  { screenId: "login-screen" },
+  { screenId: "startup-screen" },
   "",
   window.location.href
 );
@@ -296,14 +296,6 @@ async function routeAuthenticatedUser(user) {
     return;
   }
 
-  try {
-    await setDoc(doc(db, "memberDirectory", user.uid), {
-      uid: user.uid, name: profile.name, updatedAt: serverTimestamp()
-    }, { merge: true });
-  } catch {
-    // 새 규칙 게시 전에도 로그인을 유지합니다.
-  }
-
   document.getElementById("welcome-name").textContent =
     `${profile.name}님, 반갑습니다.`;
   const daysTogether = calculateDaysTogether(profile.createdAt);
@@ -313,6 +305,11 @@ async function routeAuthenticatedUser(user) {
   applyFontSize(profile.settings?.fontSize || "normal");
   showScreen("home-screen", { historyMode: "replace" });
   void loadHomeLatestNews();
+  void setDoc(doc(db, "memberDirectory", user.uid), {
+    uid: user.uid, name: profile.name, updatedAt: serverTimestamp()
+  }, { merge: true }).catch(() => {
+    // 회원 명단 동기화가 늦어져도 홈 화면 사용을 막지 않습니다.
+  });
 
   if (new URLSearchParams(window.location.search).get("open") === "bible-check") {
     history.replaceState(
@@ -5299,6 +5296,12 @@ document
 onAuthStateChanged(auth, async (user) => {
   if (signupInProgress) {
     return;
+  }
+
+  try {
+    await persistenceReady;
+  } catch {
+    // 저장 방식 확인이 실패해도 Firebase가 전달한 로그인 상태로 계속합니다.
   }
 
   if (!user) {
