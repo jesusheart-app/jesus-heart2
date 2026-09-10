@@ -1117,7 +1117,7 @@ service cloud.firestore {
         && request.resource.data.passage.size() >= 1
         && request.resource.data.passage.size() <= 120
         && request.resource.data.note is string
-        && request.resource.data.note.size() <= 500
+        && request.resource.data.note.size() <= 3000
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.createdAt == request.time
         && request.resource.data.updatedAt == request.time;
@@ -1136,7 +1136,7 @@ service cloud.firestore {
         && request.resource.data.passage.size() >= 1
         && request.resource.data.passage.size() <= 120
         && request.resource.data.note is string
-        && request.resource.data.note.size() <= 500
+        && request.resource.data.note.size() <= 3000
         && request.resource.data.updatedAt == request.time;
 
       allow delete: if isApprovedMember()
