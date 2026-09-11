@@ -19,7 +19,7 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./app-icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="./app-icon-192.png">
-  <link rel="stylesheet" href="./styles.css?v=20260910-2">
+  <link rel="stylesheet" href="./styles.css?v=20260911-1">
 </head>
 
 
@@ -1536,6 +1536,11 @@
 
         <div class="page-card">
           <h2 id="word-room-plan-list-heading">날짜별 말씀 계획</h2>
+          <div id="word-room-plan-date-controls" class="word-room-plan-month-controls">
+            <button type="button" onclick="changeWordRoomPlanDate(-1)" aria-label="전날 계획">‹</button>
+            <strong id="word-room-plan-date-title"></strong>
+            <button type="button" onclick="changeWordRoomPlanDate(1)" aria-label="다음 날 계획">›</button>
+          </div>
           <div id="word-room-plan-month-controls" class="word-room-plan-month-controls" hidden>
             <button type="button" onclick="changeWordRoomPlanMonth(-1)" aria-label="이전 달">‹</button>
             <strong id="word-room-plan-month-title"></strong>
@@ -1729,7 +1734,7 @@
        지금은 화면 전환만 담당
   ========================================= -->
 
-  <script type="module" src="./app.js?v=20260910-2"></script>
+  <script type="module" src="./app.js?v=20260911-1"></script>
 
 </body>
 </html>

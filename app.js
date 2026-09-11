@@ -61,6 +61,7 @@ let editingWordRoomPlanId = null;
 let wordRoomPlans = [];
 let showAllWordRoomPlans = false;
 let wordRoomPlanMonth = new Date();
+let wordRoomPlanDate = new Date();
 const WORD_ROOM_PLAN_NOTE_MAX_LENGTH = 3000;
 let memoryPassage = null;
 let memoryChunks = [];
@@ -4012,6 +4013,31 @@ function localDateKey(date) {
   ].join("-");
 }
 
+function formatWordRoomPlanDate(date) {
+  const today = new Date();
+  const todayKey = localDateKey(today);
+  const dateKey = localDateKey(date);
+  const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+  const tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+  const relativeLabel = dateKey === todayKey
+    ? "오늘 · "
+    : dateKey === localDateKey(yesterday)
+      ? "어제 · "
+      : dateKey === localDateKey(tomorrow)
+        ? "내일 · "
+        : "";
+  return relativeLabel + date.toLocaleDateString("ko-KR", {
+    year: "numeric", month: "long", day: "numeric", weekday: "short"
+  });
+}
+
+function formatWordRoomCommentTime(createdAt) {
+  if (!createdAt || typeof createdAt.toDate !== "function") return "방금 전";
+  return createdAt.toDate().toLocaleTimeString("ko-KR", {
+    hour: "numeric", minute: "2-digit"
+  });
+}
+
 function renderWordRoomPlans(plans, room) {
   const list = document.getElementById("word-room-plan-list");
   list.replaceChildren();
@@ -4019,15 +4045,20 @@ function renderWordRoomPlans(plans, room) {
   const todayKey = localDateKey(new Date());
 
   const toggleButton = document.getElementById("word-room-plan-toggle-button");
+  const dateControls = document.getElementById("word-room-plan-date-controls");
   const monthControls = document.getElementById("word-room-plan-month-controls");
   toggleButton.hidden = false;
   toggleButton.textContent = showAllWordRoomPlans
-    ? "오늘 계획만 보기"
+    ? "날짜별 보기"
     : "전체 계획 보기";
+  dateControls.hidden = showAllWordRoomPlans;
   monthControls.hidden = !showAllWordRoomPlans;
   if (showAllWordRoomPlans) {
     document.getElementById("word-room-plan-month-title").textContent =
       `${wordRoomPlanMonth.getFullYear()}년 ${wordRoomPlanMonth.getMonth() + 1}월`;
+  } else {
+    document.getElementById("word-room-plan-date-title").textContent =
+      formatWordRoomPlanDate(wordRoomPlanDate);
   }
 
   if (plans.length === 0) {
@@ -4036,7 +4067,7 @@ function renderWordRoomPlans(plans, room) {
     const typeLabel = getWordRoomType(room) === "prayer" ? "기도" : "말씀";
     empty.textContent = showAllWordRoomPlans
       ? "이 달에 등록된 " + typeLabel + " 계획이 없습니다."
-      : "오늘 등록된 " + typeLabel + " 계획이 없습니다.";
+      : "이 날짜에 등록된 " + typeLabel + " 계획이 없습니다.";
     list.append(empty);
     return;
   }
@@ -4152,6 +4183,12 @@ async function renderWordRoomPlanComments(room, plan, container) {
     row.className = "word-room-comment";
     const meta = document.createElement("strong");
     meta.textContent = comment.authorDisplay;
+    const commentMeta = document.createElement("div");
+    commentMeta.className = "word-room-comment-meta";
+    const time = document.createElement("span");
+    time.className = "word-room-comment-time";
+    time.textContent = formatWordRoomCommentTime(comment.createdAt);
+    commentMeta.append(meta, time);
     const content = document.createElement("p");
     content.textContent = comment.content;
     const reactions = document.createElement("div");
@@ -4166,7 +4203,7 @@ async function renderWordRoomPlanComments(room, plan, container) {
       button.disabled = comment.uid === auth.currentUser.uid;
       reactions.append(button);
     });
-    row.append(meta, content, reactions);
+    row.append(commentMeta, content, reactions);
     if (comment.uid === auth.currentUser.uid) row.append(createPrayerActionButton("× 삭제", "compact-action-button", () => deleteWordRoomPlanComment(room, plan, comment, container)));
     container.append(row);
   }
@@ -4198,7 +4235,7 @@ async function loadWordRoomPlans(room) {
   } else {
     plansQuery = query(
       plansCollection,
-      where("date", "==", getTodayDateKey()),
+      where("date", "==", localDateKey(wordRoomPlanDate)),
       limit(10)
     );
   }
@@ -4215,11 +4252,26 @@ async function toggleWordRoomPlans() {
   const room = wordRoomCache.get(currentWordRoomId);
   if (!room) return;
   showAllWordRoomPlans = !showAllWordRoomPlans;
-  if (showAllWordRoomPlans) wordRoomPlanMonth = new Date();
+  if (showAllWordRoomPlans) wordRoomPlanMonth = new Date(wordRoomPlanDate);
   try {
     await loadWordRoomPlans(room);
   } catch {
     setMessage("word-room-detail-message", "계획을 불러오지 못했습니다.", "error");
+  }
+}
+
+async function changeWordRoomPlanDate(offset) {
+  const room = wordRoomCache.get(currentWordRoomId);
+  if (!room || showAllWordRoomPlans) return;
+  wordRoomPlanDate = new Date(
+    wordRoomPlanDate.getFullYear(),
+    wordRoomPlanDate.getMonth(),
+    wordRoomPlanDate.getDate() + offset
+  );
+  try {
+    await loadWordRoomPlans(room);
+  } catch {
+    setMessage("word-room-detail-message", "선택한 날짜의 계획을 불러오지 못했습니다.", "error");
   }
 }
 
@@ -4490,6 +4542,7 @@ async function openWordRoom(roomId) {
 
   currentWordRoomId = roomId;
   showAllWordRoomPlans = false;
+  wordRoomPlanDate = new Date();
   document.getElementById("word-room-detail-name").textContent =
     room.name;
   document.getElementById("word-room-detail-description").textContent =
@@ -5418,6 +5471,7 @@ window.resetWordRoomPlanForm = resetWordRoomPlanForm;
 window.saveWordRoomPrayerTopic = saveWordRoomPrayerTopic;
 window.resetWordRoomPrayerTopicForm = resetWordRoomPrayerTopicForm;
 window.toggleWordRoomPlans = toggleWordRoomPlans;
+window.changeWordRoomPlanDate = changeWordRoomPlanDate;
 window.changeWordRoomPlanMonth = changeWordRoomPlanMonth;
 window.showGratitudeTab = showGratitudeTab;
 window.openCommunityGratitudeComposePanel = openCommunityGratitudeComposePanel;
