@@ -11,6 +11,7 @@ const db = getFirestore();
 const messaging = getMessaging();
 const appUrl = "https://jesusheart-app.github.io/jesus-heart2/?open=bible-check";
 const forceSend = process.env.FORCE_SEND === "true";
+const scheduleExpression = process.env.SCHEDULE_EXPRESSION || "";
 
 const messages = [
   "오늘 읽을 말씀을 확인해 보세요.",
@@ -35,13 +36,31 @@ const messages = [
   "오늘 감사한 마음을 예수마음에 함께 나누어 보세요."
 ];
 
-function koreanDateKey() {
+function koreanDateKey(date = new Date()) {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Seoul",
     year: "numeric",
     month: "2-digit",
     day: "2-digit"
-  }).format(new Date());
+  }).format(date);
+}
+
+function scheduledDateKey(expression, now = new Date()) {
+  const match = expression.match(/^(\d+) (\d+) \* \* (\d)$/);
+  if (!match) return koreanDateKey(now);
+
+  const [, minuteText, hourText, weekdayText] = match;
+  const scheduledWeekday = Number(weekdayText);
+  const daysSinceSchedule = (now.getUTCDay() - scheduledWeekday + 7) % 7;
+  const scheduledTime = new Date(Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate() - daysSinceSchedule,
+    Number(hourText),
+    Number(minuteText)
+  ));
+  if (scheduledTime > now) scheduledTime.setUTCDate(scheduledTime.getUTCDate() - 7);
+  return koreanDateKey(scheduledTime);
 }
 
 function chooseMessage(dateKey) {
@@ -49,7 +68,7 @@ function chooseMessage(dateKey) {
   return messages[numericDate % messages.length];
 }
 
-const dateKey = koreanDateKey();
+const dateKey = scheduledDateKey(scheduleExpression);
 const dispatchReference = db.collection("notificationDispatches").doc(dateKey);
 
 if (!forceSend && (await dispatchReference.get()).exists) {
@@ -78,7 +97,7 @@ for (let index = 0; index < devices.length; index += 500) {
   const batch = devices.slice(index, index + 500);
   const response = await messaging.sendEachForMulticast({
     tokens: batch.map((device) => device.token),
-    notification: { title: "예수마음", body },
+    notification: { title: "예수마음 알림", body },
     webpush: {
       fcmOptions: { link: appUrl },
       notification: {

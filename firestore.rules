@@ -624,7 +624,7 @@ service cloud.firestore {
         );
 
       allow delete: if isApprovedMember()
-        && resource.data.uid == request.auth.uid;
+        && (resource.data.uid == request.auth.uid || isApprovedAdmin());
     }
 
     match /communityGratitudes/{gratitudeId}/privateReactions/{uid} {
@@ -711,6 +711,7 @@ service cloud.firestore {
       allow delete: if isApprovedMember()
         && (
           resource.data.uid == request.auth.uid
+          || isApprovedAdmin()
           || (
             get(
               /databases/$(database)/documents/communityGratitudes/$(gratitudeId)
@@ -819,8 +820,8 @@ service cloud.firestore {
           && hasValidReactionCountChange(prayerId, request.auth.uid)
         );
 
-      allow delete: if signedIn()
-        && resource.data.uid == request.auth.uid;
+      allow delete: if isApprovedMember()
+        && (resource.data.uid == request.auth.uid || isApprovedAdmin());
     }
 
     match /communityPrayers/{prayerId}/comments/{commentId} {
@@ -854,6 +855,7 @@ service cloud.firestore {
       allow delete: if isApprovedMember()
         && (
           resource.data.uid == request.auth.uid
+          || isApprovedAdmin()
           || (
             get(
               /databases/$(database)/documents/communityPrayers/$(prayerId)
@@ -1074,7 +1076,7 @@ service cloud.firestore {
     }
 
     match /wordRooms/{roomId}/activities/{activityId} {
-      allow read: if isWordRoomMember(roomId);
+      allow read: if isWordRoomMember(roomId) || isApprovedAdmin();
       allow create: if isWordRoomMember(roomId)
         && request.resource.data.keys().hasOnly(['uid', 'type', 'createdAt'])
         && request.resource.data.uid == request.auth.uid
@@ -1106,8 +1108,11 @@ service cloud.firestore {
         );
 
       allow create: if isApprovedMember()
-        && get(/databases/$(database)/documents/wordRooms/$(roomId)).data.leaderUid
-          == request.auth.uid
+        && (
+          get(/databases/$(database)/documents/wordRooms/$(roomId)).data.leaderUid
+            == request.auth.uid
+          || isApprovedAdmin()
+        )
         && request.resource.data.keys().hasOnly([
           'date', 'passage', 'note', 'createdBy', 'createdAt', 'updatedAt'
         ])
@@ -1123,8 +1128,11 @@ service cloud.firestore {
         && request.resource.data.updatedAt == request.time;
 
       allow update: if isApprovedMember()
-        && get(/databases/$(database)/documents/wordRooms/$(roomId)).data.leaderUid
-          == request.auth.uid
+        && (
+          get(/databases/$(database)/documents/wordRooms/$(roomId)).data.leaderUid
+            == request.auth.uid
+          || isApprovedAdmin()
+        )
         && request.resource.data.keys().hasOnly([
           'date', 'passage', 'note', 'createdBy', 'createdAt', 'updatedAt'
         ])
@@ -1149,7 +1157,10 @@ service cloud.firestore {
 
     match /wordRooms/{roomId}/plans/{planId}/comments/{commentId} {
       allow read: if isApprovedMember()
-        && request.auth.uid in get(/databases/$(database)/documents/wordRooms/$(roomId)).data.memberUids;
+        && (
+          request.auth.uid in get(/databases/$(database)/documents/wordRooms/$(roomId)).data.memberUids
+          || isApprovedAdmin()
+        );
       allow create: if isApprovedMember()
         && request.auth.uid in get(/databases/$(database)/documents/wordRooms/$(roomId)).data.memberUids
         && request.resource.data.keys().hasOnly(['uid', 'authorDisplay', 'content', 'reactionAmenCount', 'reactionGraceCount', 'createdAt'])
@@ -1175,6 +1186,7 @@ service cloud.firestore {
             && get(/databases/$(database)/documents/wordRooms/$(roomId)/plans/$(planId)/comments/$(commentId)/privateReactions/$(request.auth.uid)).data.grace == true ? 1 : 0);
       allow delete: if isApprovedMember()
         && (resource.data.uid == request.auth.uid
+          || isApprovedAdmin()
           || !existsAfter(/databases/$(database)/documents/wordRooms/$(roomId)/plans/$(planId)));
     }
 
@@ -1193,7 +1205,10 @@ service cloud.firestore {
 
     match /wordRooms/{roomId}/prayerTopics/{topicId} {
       allow read: if isApprovedMember()
-        && request.auth.uid in get(/databases/$(database)/documents/wordRooms/$(roomId)).data.memberUids;
+        && (
+          request.auth.uid in get(/databases/$(database)/documents/wordRooms/$(roomId)).data.memberUids
+          || isApprovedAdmin()
+        );
       allow create: if isApprovedMember()
         && get(/databases/$(database)/documents/wordRooms/$(roomId)).data.get('type', 'word') == 'prayer'
         && request.auth.uid in get(/databases/$(database)/documents/wordRooms/$(roomId)).data.memberUids
@@ -1258,7 +1273,10 @@ service cloud.firestore {
 
     match /wordRooms/{roomId}/prayerTopics/{topicId}/comments/{commentId} {
       allow read: if isApprovedMember()
-        && request.auth.uid in get(/databases/$(database)/documents/wordRooms/$(roomId)).data.memberUids;
+        && (
+          request.auth.uid in get(/databases/$(database)/documents/wordRooms/$(roomId)).data.memberUids
+          || isApprovedAdmin()
+        );
       allow create: if isApprovedMember()
         && request.auth.uid in get(/databases/$(database)/documents/wordRooms/$(roomId)).data.memberUids
         && request.resource.data.keys().hasOnly(['uid', 'authorDisplay', 'content', 'createdAt'])
@@ -1271,6 +1289,7 @@ service cloud.firestore {
       allow update: if false;
       allow delete: if isApprovedMember()
         && (resource.data.uid == request.auth.uid
+          || isApprovedAdmin()
           || !existsAfter(/databases/$(database)/documents/wordRooms/$(roomId)/prayerTopics/$(topicId)));
     }
 

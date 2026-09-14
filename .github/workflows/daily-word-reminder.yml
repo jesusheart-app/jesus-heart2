@@ -37,3 +37,4 @@ jobs:
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           FORCE_SEND: ${{ inputs.force_send || 'false' }}
+          SCHEDULE_EXPRESSION: ${{ github.event.schedule }}
