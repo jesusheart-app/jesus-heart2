@@ -1895,7 +1895,7 @@ async function deleteCommunityPrayerComment(
   container
 ) {
   if (
-    comment.uid !== auth.currentUser?.uid ||
+    (comment.uid !== auth.currentUser?.uid && currentUserProfile?.role !== "admin") ||
     !window.confirm("이 댓글을 삭제하시겠습니까?")
   ) {
     return;
@@ -1972,7 +1972,7 @@ async function renderCommunityPrayerComments(prayer, container) {
         text.textContent = comment.content;
         item.append(text);
 
-        if (comment.uid === auth.currentUser?.uid) {
+        if (comment.uid === auth.currentUser?.uid || currentUserProfile?.role === "admin") {
           const remove = document.createElement("button");
           remove.type = "button";
           remove.className = "compact-action-button";
@@ -2106,21 +2106,21 @@ function renderCommunityPrayers(documents) {
     prayerContent.className = "prayer-record-content";
     appendExpandableCommunityText(card, prayerContent, prayer.content);
 
-    if (prayer.uid === auth.currentUser?.uid) {
+    if (prayer.uid === auth.currentUser?.uid || currentUserProfile?.role === "admin") {
       const actions = document.createElement("div");
       actions.className = "prayer-record-actions";
-      actions.append(
-        createPrayerActionButton(
+      if (prayer.uid === auth.currentUser?.uid) {
+        actions.append(createPrayerActionButton(
           "✎ 수정",
           "compact-action-button",
           () => editCommunityPrayer(prayer.id)
-        ),
-        createPrayerActionButton(
-          "× 삭제",
-          "compact-action-button",
-          () => deleteCommunityPrayer(prayer.id)
-        )
-      );
+        ));
+      }
+      actions.append(createPrayerActionButton(
+        "× 삭제",
+        "compact-action-button",
+        () => deleteCommunityPrayer(prayer.id)
+      ));
       card.append(actions);
     }
 
@@ -2278,7 +2278,7 @@ async function deleteCommunityPrayer(prayerId) {
   const prayer = communityPrayerCache.get(prayerId);
   if (
     !prayer ||
-    prayer.uid !== auth.currentUser?.uid ||
+    (prayer.uid !== auth.currentUser?.uid && currentUserProfile?.role !== "admin") ||
     !window.confirm("정말 삭제하시겠습니까?")
   ) {
     return;
@@ -3057,7 +3057,7 @@ async function deleteCommunityGratitudeComment(
   container
 ) {
   if (
-    comment.uid !== auth.currentUser?.uid ||
+    (comment.uid !== auth.currentUser?.uid && currentUserProfile?.role !== "admin") ||
     !window.confirm("이 댓글을 삭제하시겠습니까?")
   ) {
     return;
@@ -3142,7 +3142,7 @@ async function renderCommunityGratitudeComments(
         text.textContent = comment.content;
         item.append(text);
 
-        if (comment.uid === auth.currentUser?.uid) {
+        if (comment.uid === auth.currentUser?.uid || currentUserProfile?.role === "admin") {
           const remove = document.createElement("button");
           remove.type = "button";
           remove.className = "compact-action-button";
@@ -3226,21 +3226,21 @@ function renderCommunityGratitudes(documents) {
     content.className = "gratitude-text";
     appendExpandableCommunityText(card, content, gratitude.content);
 
-    if (gratitude.uid === auth.currentUser?.uid) {
+    if (gratitude.uid === auth.currentUser?.uid || currentUserProfile?.role === "admin") {
       const actions = document.createElement("div");
       actions.className = "prayer-record-actions";
-      actions.append(
-        createPrayerActionButton(
+      if (gratitude.uid === auth.currentUser?.uid) {
+        actions.append(createPrayerActionButton(
           "✎ 수정",
           "compact-action-button",
           () => editCommunityGratitude(gratitude.id)
-        ),
-        createPrayerActionButton(
-          "× 삭제",
-          "compact-action-button",
-          () => deleteCommunityGratitude(gratitude.id)
-        )
-      );
+        ));
+      }
+      actions.append(createPrayerActionButton(
+        "× 삭제",
+        "compact-action-button",
+        () => deleteCommunityGratitude(gratitude.id)
+      ));
       card.append(actions);
     }
 
@@ -3367,7 +3367,7 @@ async function deleteCommunityGratitude(gratitudeId) {
   const gratitude = communityGratitudeCache.get(gratitudeId);
   if (
     !gratitude ||
-    gratitude.uid !== auth.currentUser?.uid ||
+    (gratitude.uid !== auth.currentUser?.uid && currentUserProfile?.role !== "admin") ||
     !window.confirm("이 감사 나눔을 삭제하시겠습니까?")
   ) {
     return;
@@ -3614,10 +3614,12 @@ function renderWordRooms(documents) {
 }
 
 async function loadWordRooms() {
-  const roomsQuery = query(
-    collection(db, "wordRooms"),
-    where("memberUids", "array-contains", auth.currentUser.uid)
-  );
+  const roomsQuery = currentUserProfile?.role === "admin"
+    ? collection(db, "wordRooms")
+    : query(
+      collection(db, "wordRooms"),
+      where("memberUids", "array-contains", auth.currentUser.uid)
+    );
   const snapshot = await getDocs(roomsQuery);
   renderWordRooms(snapshot.docs);
 }
@@ -3816,7 +3818,7 @@ function renderWordRoomMembers(room, members) {
       nameItem.append(role);
     }
 
-    if (room.leaderUid === auth.currentUser.uid && member.uid !== room.leaderUid) {
+    if (canManageWordRoom(room) && member.uid !== room.leaderUid) {
       const removeButton = createPrayerActionButton(
         "×",
         "word-room-member-remove-button",
@@ -3830,7 +3832,7 @@ function renderWordRoomMembers(room, members) {
   });
   list.append(summary);
 
-  if (room.leaderUid === auth.currentUser.uid && members.length > 1) {
+  if (canManageWordRoom(room) && members.length > 1) {
     const leadershipControl = document.createElement("div");
     leadershipControl.className = "word-room-leadership-control";
 
@@ -3872,10 +3874,10 @@ async function refreshCurrentWordRoom() {
   renderWordRoomMembers(room, members);
 
   const inviteSection = document.getElementById("word-room-invite-section");
-  const isLeader = room.leaderUid === auth.currentUser.uid;
-  document.getElementById("word-room-management-buttons").hidden = !isLeader;
+  const canManage = canManageWordRoom(room);
+  document.getElementById("word-room-management-buttons").hidden = !canManage;
   closeManagementPanel("word-room-invite-section");
-  if (isLeader) {
+  if (canManage) {
     const directory = await getDocs(collection(db, "memberDirectory"));
     const candidates = directory.docs.map((item) => item.data())
       .filter((member) => !room.memberUids.includes(member.uid))
@@ -3901,7 +3903,7 @@ async function refreshCurrentWordRoom() {
 async function inviteWordRoomMember() {
   const uid = document.getElementById("word-room-invite-member").value;
   const room = wordRoomCache.get(currentWordRoomId);
-  if (!uid || !room || room.leaderUid !== auth.currentUser.uid) return;
+  if (!uid || !room || !canManageWordRoom(room)) return;
   const personSnapshot = await getDoc(doc(db, "memberDirectory", uid));
   if (!personSnapshot.exists()) return;
   const person = personSnapshot.data();
@@ -3919,7 +3921,7 @@ async function inviteWordRoomMember() {
 async function removeWordRoomMember(uid) {
   const room = wordRoomCache.get(currentWordRoomId);
   const member = currentWordRoomMembers.get(uid);
-  if (!room || !member || room.leaderUid !== auth.currentUser.uid || !window.confirm(member.name + "님을 모임방에서 퇴장시키겠습니까?")) return;
+  if (!room || !member || !canManageWordRoom(room) || !window.confirm(member.name + "님을 모임방에서 퇴장시키겠습니까?")) return;
   const batch = writeBatch(db);
   batch.update(doc(db, "wordRooms", room.id), { memberUids: room.memberUids.filter((item) => item !== uid), updatedAt: serverTimestamp() });
   batch.delete(doc(db, "wordRooms", room.id, "members", uid));
@@ -3933,7 +3935,7 @@ async function removeWordRoomMember(uid) {
 async function transferWordRoomLeadership(uid) {
   const room = wordRoomCache.get(currentWordRoomId);
   const member = currentWordRoomMembers.get(uid);
-  if (!room || !member || room.leaderUid !== auth.currentUser.uid || !window.confirm(member.name + "님에게 방장을 넘기시겠습니까?")) return;
+  if (!room || !member || !canManageWordRoom(room) || !window.confirm(member.name + "님에게 방장을 넘기시겠습니까?")) return;
   const batch = writeBatch(db);
   batch.update(doc(db, "wordRooms", room.id), { leaderUid: uid, leaderName: member.name, updatedAt: serverTimestamp() });
   batch.update(doc(db, "wordRooms", room.id, "members", room.leaderUid), { role: "member" });
@@ -4093,7 +4095,7 @@ function renderWordRoomPlans(plans, room) {
       note.textContent = plan.note;
       body.append(note);
     }
-    if (room.leaderUid === auth.currentUser.uid) {
+    if (canManageWordRoom(room)) {
       const actions = document.createElement("div");
       actions.className = "compact-actions";
       actions.append(
@@ -4162,7 +4164,7 @@ async function saveWordRoomPlanComment(room, plan, textarea, container) {
 }
 
 async function deleteWordRoomPlanComment(room, plan, comment, container) {
-  if (comment.uid !== auth.currentUser.uid || !window.confirm("이 나눔을 삭제하시겠습니까?")) return;
+  if ((comment.uid !== auth.currentUser.uid && !canManageWordRoom(room)) || !window.confirm("이 나눔을 삭제하시겠습니까?")) return;
   try {
     const batch = writeBatch(db);
     batch.delete(doc(db, "wordRooms", room.id, "plans", plan.id, "comments", comment.id));
@@ -4173,6 +4175,7 @@ async function deleteWordRoomPlanComment(room, plan, comment, container) {
 
 async function renderWordRoomPlanComments(room, plan, container) {
   container.replaceChildren();
+  const isMember = room.memberUids.includes(auth.currentUser.uid);
   const snapshot = await getDocs(query(
     collection(db, "wordRooms", room.id, "plans", plan.id, "comments"),
     orderBy("createdAt", "desc"), limit(50)
@@ -4194,19 +4197,20 @@ async function renderWordRoomPlanComments(room, plan, container) {
     const reactions = document.createElement("div");
     reactions.className = "word-room-comment-reactions";
     let mine = { amen: false, grace: false };
-    if (comment.uid !== auth.currentUser.uid) {
+    if (isMember && comment.uid !== auth.currentUser.uid) {
       const mineSnapshot = await getDoc(doc(db, "wordRooms", room.id, "plans", plan.id, "comments", comment.id, "privateReactions", auth.currentUser.uid));
       if (mineSnapshot.exists()) mine = mineSnapshot.data();
     }
     [["amen", "🙌 아멘", "reactionAmenCount"], ["grace", "❤️ 은혜받았어요", "reactionGraceCount"]].forEach(([type, label, field]) => {
       const button = createPrayerActionButton(label + " " + (comment[field] || 0), "secondary-button word-room-reaction-button" + (mine[type] ? " active" : ""), () => toggleWordRoomCommentReaction(room, plan, comment, type, container));
-      button.disabled = comment.uid === auth.currentUser.uid;
+      button.disabled = !isMember || comment.uid === auth.currentUser.uid;
       reactions.append(button);
     });
     row.append(commentMeta, content, reactions);
-    if (comment.uid === auth.currentUser.uid) row.append(createPrayerActionButton("× 삭제", "compact-action-button", () => deleteWordRoomPlanComment(room, plan, comment, container)));
+    if (comment.uid === auth.currentUser.uid || canManageWordRoom(room)) row.append(createPrayerActionButton("× 삭제", "compact-action-button", () => deleteWordRoomPlanComment(room, plan, comment, container)));
     container.append(row);
   }
+  if (!isMember) return;
   const textarea = document.createElement("textarea");
   textarea.maxLength = 1000;
   textarea.rows = 3;
@@ -4295,7 +4299,7 @@ async function saveWordRoomPlan() {
   const date = document.getElementById("word-room-plan-date").value;
   const passage = document.getElementById("word-room-plan-passage").value.trim();
   const note = document.getElementById("word-room-plan-note").value.trim();
-  if (!room || room.leaderUid !== auth.currentUser.uid || !date ||
+  if (!room || !canManageWordRoom(room) || !date ||
       !passage || passage.length > 120 || note.length > WORD_ROOM_PLAN_NOTE_MAX_LENGTH) {
     setMessage("word-room-plan-message", getWordRoomType(room) === "prayer" ? "날짜와 기도 내용을 확인해주세요." : "날짜와 읽을 말씀을 확인해주세요.", "error");
     return;
@@ -4330,7 +4334,7 @@ async function saveWordRoomPlan() {
 function editWordRoomPlan(planId) {
   const plan = wordRoomPlanCache.get(planId);
   const room = wordRoomCache.get(currentWordRoomId);
-  if (!plan || !room || room.leaderUid !== auth.currentUser.uid) return;
+  if (!plan || !room || !canManageWordRoom(room)) return;
   editingWordRoomPlanId = planId;
   document.getElementById("word-room-plan-date").value = plan.date;
   document.getElementById("word-room-plan-passage").value = plan.passage;
@@ -4344,7 +4348,7 @@ function editWordRoomPlan(planId) {
 async function deleteWordRoomPlan(planId) {
   const plan = wordRoomPlanCache.get(planId);
   const room = wordRoomCache.get(currentWordRoomId);
-  if (!plan || !room || room.leaderUid !== auth.currentUser.uid ||
+  if (!plan || !room || !canManageWordRoom(room) ||
       !window.confirm("이 계획을 삭제하시겠습니까?")) return;
   try {
     const comments = await getDocs(collection(db, "wordRooms", room.id, "plans", planId, "comments"));
@@ -4484,9 +4488,10 @@ async function renderWordRoomPrayerTopicComments(room, topic, container) {
     const name = document.createElement("strong"); name.textContent = comment.authorDisplay;
     const content = document.createElement("p"); content.textContent = comment.content;
     row.append(name, content);
-    if (comment.uid === auth.currentUser.uid) row.append(createPrayerActionButton("× 삭제", "compact-action-button", () => deleteWordRoomPrayerTopicComment(room, topic, comment.id, container)));
+    if (comment.uid === auth.currentUser.uid || canManageWordRoom(room)) row.append(createPrayerActionButton("× 삭제", "compact-action-button", () => deleteWordRoomPrayerTopicComment(room, topic, comment.id, container)));
     container.append(row);
   });
+  if (!room.memberUids.includes(auth.currentUser.uid)) return;
   const textarea = document.createElement("textarea");
   textarea.maxLength = 500; textarea.rows = 2; textarea.placeholder = "격려와 기도 댓글을 남겨주세요";
   container.append(textarea, createPrayerActionButton("댓글 남기기", "primary-button", () => saveWordRoomPrayerTopicComment(room, topic, textarea, container)));
@@ -4504,14 +4509,15 @@ async function renderWordRoomPrayerTopicCard(room, topicId, existingCard = null)
   card.append(meta, title);
   if (topic.content) { const content = document.createElement("p"); content.textContent = topic.content; card.append(content); }
   const reactions = document.createElement("div"); reactions.className = "word-room-comment-reactions";
+  const isMember = room.memberUids.includes(auth.currentUser.uid);
   let mine = { amen: false, prayer: false };
-  if (topic.uid !== auth.currentUser.uid) {
+  if (isMember && topic.uid !== auth.currentUser.uid) {
     const mineSnapshot = await getDoc(doc(db, "wordRooms", room.id, "prayerTopics", topic.id, "privateReactions", auth.currentUser.uid));
     if (mineSnapshot.exists()) mine = mineSnapshot.data();
   }
   [["amen", "🙌 아멘", "reactionAmenCount"], ["prayer", "🙏 함께 기도해요", "reactionPrayerCount"]].forEach(([type, label, field]) => {
     const button = createPrayerActionButton(label + " " + (topic[field] || 0), "secondary-button word-room-reaction-button" + (mine[type] ? " active" : ""), () => toggleWordRoomPrayerTopicReaction(room, topic, type, card));
-    button.disabled = topic.uid === auth.currentUser.uid; reactions.append(button);
+    button.disabled = !isMember || topic.uid === auth.currentUser.uid; reactions.append(button);
   });
   card.append(reactions);
   if (topic.uid === auth.currentUser.uid || canManageWordRoom(room)) {
@@ -4559,13 +4565,16 @@ async function openWordRoom(roomId) {
     resetWordRoomPlanForm();
     await loadWordRoomPlans(refreshedRoom);
     const isPrayer = getWordRoomType(refreshedRoom) === "prayer";
-    document.getElementById("word-room-prayer-topic-form-section").hidden = !isPrayer;
+    const isMember = refreshedRoom.memberUids.includes(auth.currentUser.uid);
+    document.getElementById("word-room-prayer-topic-form-section").hidden = !isPrayer || !isMember;
     document.getElementById("word-room-prayer-topic-list-section").hidden = !isPrayer;
     if (isPrayer) {
       resetWordRoomPrayerTopicForm();
       await loadWordRoomPrayerTopics(refreshedRoom);
     }
-    await markWordRoomAsRead(roomId);
+    if (refreshedRoom.memberUids.includes(auth.currentUser.uid)) {
+      await markWordRoomAsRead(roomId);
+    }
     setMessage("word-room-detail-message", "");
   } catch { setMessage("word-room-detail-message", "참여자 목록을 불러오지 못했습니다.", "error"); }
 }
@@ -4999,6 +5008,32 @@ async function toggleDailyNotifications() {
     );
   } finally {
     button.disabled = false;
+  }
+}
+
+async function testDeviceNotification() {
+  if (!auth.currentUser || currentUserProfile?.approved !== true) return;
+  const button = document.getElementById("mypage-notification-test-button");
+  setBusy(button.id, true, "테스트 중...", "이 기기 알림 테스트");
+  setMessage("mypage-notification-message", "");
+  try {
+    if (!(await prepareMessaging())) throw new Error("unsupported-messaging");
+    const permission = Notification.permission === "granted"
+      ? "granted"
+      : await Notification.requestPermission();
+    if (permission !== "granted") throw new Error("permission-denied");
+    await messagingServiceWorker.showNotification("예수마음 알림", {
+      body: "알림이 정상적으로 표시되고 있습니다.",
+      icon: "./notification-icon-192.png",
+      badge: "./notification-badge-96.png",
+      tag: "device-notification-test"
+    });
+    setMessage("mypage-notification-message", "테스트 알림을 보냈습니다. 휴대폰 알림창을 확인해주세요.", "success");
+  } catch (error) {
+    setMessage("mypage-notification-message", getNotificationErrorMessage(error), "error");
+  } finally {
+    button.disabled = false;
+    button.textContent = "이 기기 알림 테스트";
   }
 }
 
@@ -5460,6 +5495,7 @@ window.resetNewsForm = resetNewsForm;
 window.openMyPage = openMyPage;
 window.saveMyPageSettings = saveMyPageSettings;
 window.toggleDailyNotifications = toggleDailyNotifications;
+window.testDeviceNotification = testDeviceNotification;
 window.openWordRoom = openWordRoom;
 window.editCurrentWordRoom = editCurrentWordRoom;
 window.saveWordRoom = saveWordRoom;

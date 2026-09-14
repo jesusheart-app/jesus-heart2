@@ -1967,6 +1967,7 @@
     .mypage-notification-setting strong { color: #443C34; }
     .mypage-notification-setting p { margin: 5px 0 0 !important; color: #81786D !important; font-size: 13px; }
     .mypage-notification-setting button { width: auto; min-width: 105px; margin: 0; }
+    #mypage-notification-test-button { width: 100%; margin-top: 12px; }
 
     .word-room-leave-button {
       display: block;
