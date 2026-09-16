@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "send-reminder": "node scripts/send-daily-reminder.mjs"
+    "send-reminder": "node scripts/send-daily-reminder.mjs",
+    "test": "node --test scripts/*.test.mjs"
   },
   "dependencies": {
     "firebase-admin": "^13.5.0"

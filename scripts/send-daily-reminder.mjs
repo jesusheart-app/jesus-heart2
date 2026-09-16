@@ -1,6 +1,7 @@
 import { cert, initializeApp } from "firebase-admin/app";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { getMessaging } from "firebase-admin/messaging";
+import { reminderRunState } from "./reminder-schedule.mjs";
 
 const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT;
 if (!serviceAccountJson) throw new Error("FIREBASE_SERVICE_ACCOUNT secret is required.");
@@ -11,7 +12,6 @@ const db = getFirestore();
 const messaging = getMessaging();
 const appUrl = "https://jesusheart-app.github.io/jesus-heart2/?open=bible-check";
 const forceSend = process.env.FORCE_SEND === "true";
-const scheduleExpression = process.env.SCHEDULE_EXPRESSION || "";
 
 const messages = [
   "오늘 읽을 말씀을 확인해 보세요.",
@@ -36,39 +36,19 @@ const messages = [
   "오늘 감사한 마음을 예수마음에 함께 나누어 보세요."
 ];
 
-function koreanDateKey(date = new Date()) {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).format(date);
-}
-
-function scheduledDateKey(expression, now = new Date()) {
-  const match = expression.match(/^(\d+) (\d+) \* \* (\d)$/);
-  if (!match) return koreanDateKey(now);
-
-  const [, minuteText, hourText, weekdayText] = match;
-  const scheduledWeekday = Number(weekdayText);
-  const daysSinceSchedule = (now.getUTCDay() - scheduledWeekday + 7) % 7;
-  const scheduledTime = new Date(Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    now.getUTCDate() - daysSinceSchedule,
-    Number(hourText),
-    Number(minuteText)
-  ));
-  if (scheduledTime > now) scheduledTime.setUTCDate(scheduledTime.getUTCDate() - 7);
-  return koreanDateKey(scheduledTime);
-}
-
 function chooseMessage(dateKey) {
   const numericDate = Number(dateKey.replaceAll("-", ""));
   return messages[numericDate % messages.length];
 }
 
-const dateKey = scheduledDateKey(scheduleExpression);
+const runState = reminderRunState();
+const dateKey = runState.dateKey;
+
+if (!forceSend && !runState.shouldSend) {
+  console.log(`Reminder skipped for ${dateKey}: ${runState.reason}.`);
+  process.exit(0);
+}
+
 const dispatchReference = db.collection("notificationDispatches").doc(dateKey);
 
 if (!forceSend && (await dispatchReference.get()).exists) {
@@ -92,6 +72,7 @@ const body = chooseMessage(dateKey);
 let successCount = 0;
 let failureCount = 0;
 const invalidDeviceReferences = [];
+const failureCodes = new Map();
 
 for (let index = 0; index < devices.length; index += 500) {
   const batch = devices.slice(index, index + 500);
@@ -112,6 +93,7 @@ for (let index = 0; index < devices.length; index += 500) {
   failureCount += response.failureCount;
   response.responses.forEach((result, responseIndex) => {
     const code = result.error?.code;
+    if (code) failureCodes.set(code, (failureCodes.get(code) || 0) + 1);
     if (code === "messaging/registration-token-not-registered" ||
         code === "messaging/invalid-registration-token") {
       invalidDeviceReferences.push(batch[responseIndex].reference);
@@ -126,7 +108,7 @@ for (let index = 0; index < invalidDeviceReferences.length; index += 450) {
   await cleanup.commit();
 }
 
-if (!forceSend) {
+if (!forceSend && successCount > 0) {
   await dispatchReference.set({
     sentAt: FieldValue.serverTimestamp(),
     body,
@@ -135,4 +117,11 @@ if (!forceSend) {
   });
 }
 
+if (failureCodes.size > 0) {
+  console.log(`Failure codes: ${JSON.stringify(Object.fromEntries(failureCodes))}`);
+}
 console.log(`Sent ${successCount}; failed ${failureCount}; removed ${invalidDeviceReferences.length}.`);
+
+if (!forceSend && successCount === 0) {
+  throw new Error("No notifications were accepted; the next scheduled run will retry.");
+}
