@@ -307,6 +307,7 @@ async function routeAuthenticatedUser(user) {
   applyFontSize(profile.settings?.fontSize || "normal");
   showScreen("home-screen", { historyMode: "replace" });
   void loadHomeLatestNews();
+  void syncDailyNotificationRegistration();
   void setDoc(doc(db, "memberDirectory", user.uid), {
     uid: user.uid, name: profile.name, updatedAt: serverTimestamp()
   }, { merge: true }).catch(() => {
@@ -4889,7 +4890,7 @@ async function saveNotificationPreference(enabled) {
   currentUserProfile = { ...currentUserProfile, settings };
 }
 
-async function enableDailyNotifications() {
+async function registerNotificationDevice({ requestPermission = false, savePreference = false } = {}) {
   if (!appSettings.firebaseWebPushPublicKey) throw new Error("missing-vapid-key");
   let messagingReady = false;
   try {
@@ -4900,7 +4901,11 @@ async function enableDailyNotifications() {
   }
   if (!messagingReady) throw new Error("unsupported-messaging");
 
-  const permission = await Notification.requestPermission();
+  const permission = Notification.permission === "granted"
+    ? "granted"
+    : requestPermission
+      ? await Notification.requestPermission()
+      : Notification.permission;
   if (permission !== "granted") throw new Error("permission-denied");
 
   let token;
@@ -4929,13 +4934,35 @@ async function enableDailyNotifications() {
     error.notificationStage = "firestore";
     throw error;
   }
-  try {
-    await saveNotificationPreference(true);
-  } catch (error) {
-    error.notificationStage = "settings";
-    throw error;
+  if (savePreference && currentUserProfile.settings?.notifications !== true) {
+    try {
+      await saveNotificationPreference(true);
+    } catch (error) {
+      error.notificationStage = "settings";
+      throw error;
+    }
   }
   currentNotificationToken = token;
+  return token;
+}
+
+async function enableDailyNotifications() {
+  return registerNotificationDevice({ requestPermission: true, savePreference: true });
+}
+
+async function syncDailyNotificationRegistration() {
+  if (!auth.currentUser || currentUserProfile?.approved !== true) return false;
+  if (currentUserProfile.settings?.notifications !== true) return false;
+  if (typeof Notification === "undefined" || Notification.permission !== "granted") return false;
+  if (currentNotificationToken) return true;
+
+  try {
+    await registerNotificationDevice();
+    return true;
+  } catch (error) {
+    console.warn("Notification registration refresh failed", error);
+    return false;
+  }
 }
 
 function getNotificationErrorMessage(error) {
@@ -5014,26 +5041,27 @@ async function toggleDailyNotifications() {
 async function testDeviceNotification() {
   if (!auth.currentUser || currentUserProfile?.approved !== true) return;
   const button = document.getElementById("mypage-notification-test-button");
-  setBusy(button.id, true, "테스트 중...", "이 기기 알림 테스트");
+  setBusy(button.id, true, "확인 중...", "이 기기 알림 등록 확인");
   setMessage("mypage-notification-message", "");
   try {
-    if (!(await prepareMessaging())) throw new Error("unsupported-messaging");
-    const permission = Notification.permission === "granted"
-      ? "granted"
-      : await Notification.requestPermission();
-    if (permission !== "granted") throw new Error("permission-denied");
+    await registerNotificationDevice({ requestPermission: true, savePreference: true });
     await messagingServiceWorker.showNotification("예수마음 알림", {
-      body: "알림이 정상적으로 표시되고 있습니다.",
+      body: "이 기기의 알림 등록을 새로 확인했습니다.",
       icon: "./notification-icon-192.png",
       badge: "./notification-badge-96.png",
       tag: "device-notification-test"
     });
-    setMessage("mypage-notification-message", "테스트 알림을 보냈습니다. 휴대폰 알림창을 확인해주세요.", "success");
+    setNotificationUI(true, "예수마음 알림을 받고 있습니다.");
+    setMessage(
+      "mypage-notification-message",
+      "이 기기의 알림 등록을 갱신했습니다. 휴대폰 알림창도 확인해주세요.",
+      "success"
+    );
   } catch (error) {
     setMessage("mypage-notification-message", getNotificationErrorMessage(error), "error");
   } finally {
     button.disabled = false;
-    button.textContent = "이 기기 알림 테스트";
+    button.textContent = "이 기기 알림 등록 확인";
   }
 }
 
@@ -5448,6 +5476,7 @@ document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") {
     setDailyMessage();
     syncManagementPanelScrollLock();
+    void syncDailyNotificationRegistration();
   }
 });
 
