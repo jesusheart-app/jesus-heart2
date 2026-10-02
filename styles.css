@@ -325,7 +325,7 @@
 
     .welcome-card {
       padding: 24px;
-      margin-bottom: 24px;
+      margin-bottom: 14px;
 
       border-radius: 24px;
 
@@ -349,6 +349,104 @@
       color: #6C5844;
       font-size: 15px !important;
       font-weight: 750;
+    }
+
+    .home-community-summary {
+      margin-bottom: 16px;
+      overflow: hidden;
+      border: 1px solid #DED4C7;
+      border-radius: 20px;
+      background: #FFFDF9;
+      box-shadow: 0 5px 18px rgba(70, 60, 50, 0.05);
+    }
+
+    .home-community-summary-heading {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 13px 16px 9px;
+    }
+
+    .home-community-summary-heading h2 {
+      margin: 0;
+      color: #443C34;
+      font-size: 16px;
+    }
+
+    .home-community-summary-heading > span {
+      color: #8A8075;
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .home-community-row {
+      width: 100%;
+      min-height: 68px;
+      display: grid;
+      grid-template-columns: 34px minmax(0, 1fr) 14px;
+      align-items: center;
+      gap: 10px;
+      padding: 11px 15px;
+      border: 0;
+      border-top: 1px solid #EEE7DD;
+      background: transparent;
+      color: #443C34;
+      text-align: left;
+    }
+
+    .home-community-row:active {
+      background: #F7F2EA;
+    }
+
+    .home-community-icon {
+      font-size: 23px;
+      text-align: center;
+    }
+
+    .home-community-copy {
+      min-width: 0;
+      display: grid;
+      gap: 4px;
+    }
+
+    .home-community-copy strong {
+      font-size: 14px;
+    }
+
+    .home-community-copy > span:last-child {
+      overflow: hidden;
+      color: #6F655A;
+      font-size: 13px;
+      line-height: 1.45;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .home-community-title-line {
+      min-width: 0;
+      display: flex;
+      align-items: baseline;
+      gap: 7px;
+    }
+
+    .home-community-title-line > span {
+      overflow: hidden;
+      color: #91867A;
+      font-size: 11px;
+      font-weight: 650;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .home-community-arrow {
+      color: #9D9184;
+      font-size: 24px;
+      line-height: 1;
+    }
+
+    .home-bible-summary[data-completed="true"] {
+      background: #F3F7F0;
     }
 
     .home-latest-news {
@@ -2118,6 +2216,10 @@
       .page-card { padding: 18px 16px; border-radius: 18px; }
       .app-header { padding-left: 16px; padding-right: 16px; }
       .menu-grid { gap: 10px; }
+      .home-content { padding-top: 18px; padding-left: 14px; padding-right: 14px; }
+      .welcome-card { padding: 18px; }
+      .home-community-summary-heading { padding-left: 14px; padding-right: 14px; }
+      .home-community-row { padding-left: 12px; padding-right: 12px; }
       .menu-button { min-height: 104px; padding: 14px 8px; }
       .memory-chunk-button,
       .memory-selected-chunk { width: 100%; justify-content: flex-start; text-align: left; }

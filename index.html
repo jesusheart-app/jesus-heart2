@@ -19,7 +19,7 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./app-icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="./app-icon-192.png">
-  <link rel="stylesheet" href="./styles.css?v=20260911-1">
+  <link rel="stylesheet" href="./styles.css?v=20261002-1">
 </head>
 
 
@@ -351,6 +351,43 @@
           </p>
 
         </div>
+
+        <section class="home-community-summary" aria-labelledby="home-community-summary-title">
+          <div class="home-community-summary-heading">
+            <h2 id="home-community-summary-title">오늘의 예수마음</h2>
+            <span>공동체 한눈에 보기</span>
+          </div>
+
+          <button
+            class="home-community-row home-bible-summary"
+            type="button"
+            onclick="openBibleCheck()"
+          >
+            <span class="home-community-icon" aria-hidden="true">📖</span>
+            <span class="home-community-copy">
+              <strong>오늘 말씀</strong>
+              <span id="home-bible-summary-text">참여 현황을 확인하고 있어요.</span>
+            </span>
+            <span class="home-community-arrow" aria-hidden="true">›</span>
+          </button>
+
+          <button
+            id="home-latest-gratitude"
+            class="home-community-row home-gratitude-summary"
+            type="button"
+            onclick="openGratitude('community')"
+          >
+            <span class="home-community-icon" aria-hidden="true">🌿</span>
+            <span class="home-community-copy">
+              <span class="home-community-title-line">
+                <strong>최근 감사나눔</strong>
+                <span id="home-latest-gratitude-meta"></span>
+              </span>
+              <span id="home-latest-gratitude-content">최근 나눔을 확인하고 있어요.</span>
+            </span>
+            <span class="home-community-arrow" aria-hidden="true">›</span>
+          </button>
+        </section>
 
         <button
           id="home-latest-news"
@@ -1735,7 +1772,7 @@
        지금은 화면 전환만 담당
   ========================================= -->
 
-  <script type="module" src="./app.js?v=20260916-1"></script>
+  <script type="module" src="./app.js?v=20261002-1"></script>
 
 </body>
 </html>

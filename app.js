@@ -115,6 +115,10 @@ function showScreen(screenId, options = {}) {
 
   target.classList.add("active");
 
+  if (screenId === "home-screen" && currentUserProfile?.approved === true) {
+    void loadHomeCommunitySummary();
+  }
+
   if (historyMode === "push" && activeScreen?.id !== screenId) {
     history.pushState({ screenId }, "", window.location.href);
   } else if (historyMode === "replace") {
@@ -600,7 +604,7 @@ function renderTodayCommunityBibleCount(count, currentUserCompleted) {
   );
 }
 
-async function loadTodayCommunityBibleCount() {
+async function getTodayCommunityBibleStatus() {
   const today = getTodayDateKey();
   const personalReference = getBibleCheckReference(today);
   const communityReference = getCommunityBibleReference(today);
@@ -631,9 +635,18 @@ async function loadTodayCommunityBibleCount() {
     )
   );
 
-  renderTodayCommunityBibleCount(
-    participantsSnapshot.size,
+  return {
+    count: participantsSnapshot.size,
     currentUserCompleted
+  };
+}
+
+async function loadTodayCommunityBibleCount() {
+  const status = await getTodayCommunityBibleStatus();
+
+  renderTodayCommunityBibleCount(
+    status.count,
+    status.currentUserCompleted
   );
 }
 
@@ -3414,14 +3427,14 @@ async function deleteCommunityGratitude(gratitudeId) {
   }
 }
 
-async function openGratitude() {
+async function openGratitude(initialTab = "private") {
   if (!auth.currentUser || currentUserProfile?.approved !== true) {
     showScreen("login-screen", { historyMode: "replace" });
     return;
   }
 
   showScreen("thanks-screen");
-  showGratitudeTab("private");
+  showGratitudeTab(initialTab === "community" ? "community" : "private");
   resetPrivateGratitudeForm();
   resetCommunityGratitudeForm();
   setMessage("private-gratitude-message", "감사 기록을 불러오는 중입니다.");
@@ -4651,6 +4664,83 @@ async function loadHomeLatestNews() {
     card.hidden = false;
   } catch {
     // 교회소식을 불러오지 못해도 홈 화면의 다른 기능은 그대로 이용합니다.
+  }
+}
+
+function formatHomeActivityDate(timestamp) {
+  if (!timestamp || typeof timestamp.toDate !== "function") return "방금 전";
+
+  const activityDate = timestamp.toDate();
+  const today = new Date();
+  if (activityDate.toDateString() === today.toDateString()) return "오늘";
+
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  if (activityDate.toDateString() === yesterday.toDateString()) return "어제";
+
+  return activityDate.toLocaleDateString("ko-KR", {
+    month: "long",
+    day: "numeric"
+  });
+}
+
+async function loadHomeBibleSummary() {
+  const row = document.querySelector(".home-bible-summary");
+  const text = document.getElementById("home-bible-summary-text");
+  if (!row || !text || !auth.currentUser) return;
+
+  const status = await getTodayCommunityBibleStatus();
+  const completed = status.currentUserCompleted;
+  const count = status.count;
+
+  row.dataset.completed = String(completed);
+  if (completed) {
+    text.textContent = `오늘 ${count}명이 읽었어요 · 나도 참여했어요`;
+  } else if (count === 0) {
+    text.textContent = "오늘은 아직 첫 말씀체크를 기다리고 있어요.";
+  } else {
+    text.textContent = `오늘 ${count}명이 읽었어요 · 나는 아직 미체크`;
+  }
+}
+
+async function loadHomeLatestGratitude() {
+  const meta = document.getElementById("home-latest-gratitude-meta");
+  const content = document.getElementById("home-latest-gratitude-content");
+  if (!meta || !content) return;
+
+  const snapshot = await getDocs(query(
+    collection(db, "communityGratitudes"),
+    orderBy("createdAt", "desc"),
+    limit(1)
+  ));
+  const latest = snapshot.docs[0]?.data();
+
+  if (!latest) {
+    meta.textContent = "";
+    content.textContent = "아직 함께 나눈 감사가 없어요.";
+    return;
+  }
+
+  meta.textContent = `${latest.authorDisplay} · ${formatHomeActivityDate(latest.createdAt)}`;
+  content.textContent = latest.content;
+}
+
+async function loadHomeCommunitySummary() {
+  if (!auth.currentUser || currentUserProfile?.approved !== true) return;
+
+  const [bibleResult, gratitudeResult] = await Promise.allSettled([
+    loadHomeBibleSummary(),
+    loadHomeLatestGratitude()
+  ]);
+
+  if (bibleResult.status === "rejected") {
+    document.getElementById("home-bible-summary-text").textContent =
+      "참여 현황을 불러오지 못했어요. 눌러서 확인해주세요.";
+  }
+  if (gratitudeResult.status === "rejected") {
+    document.getElementById("home-latest-gratitude-meta").textContent = "";
+    document.getElementById("home-latest-gratitude-content").textContent =
+      "최근 나눔을 불러오지 못했어요. 눌러서 확인해주세요.";
   }
 }
 
