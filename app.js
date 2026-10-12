@@ -4047,6 +4047,19 @@ function formatWordRoomPlanDate(date) {
   });
 }
 
+function getPreviousWordRoomPlanDate(date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate() - 1);
+}
+
+function formatWordRoomPlanRange(endDate) {
+  if (localDateKey(endDate) === getTodayDateKey()) return "어제 · 오늘";
+  const startDate = getPreviousWordRoomPlanDate(endDate);
+  const formatDate = (date) => date.toLocaleDateString("ko-KR", {
+    month: "long", day: "numeric"
+  });
+  return `${formatDate(startDate)} ~ ${formatDate(endDate)}`;
+}
+
 function formatWordRoomCommentTime(createdAt) {
   if (!createdAt || typeof createdAt.toDate !== "function") return "방금 전";
   return createdAt.toDate().toLocaleTimeString("ko-KR", {
@@ -4058,7 +4071,8 @@ function renderWordRoomPlans(plans, room) {
   const list = document.getElementById("word-room-plan-list");
   list.replaceChildren();
   wordRoomPlanCache = new Map(plans.map((plan) => [plan.id, plan]));
-  const todayKey = localDateKey(new Date());
+  const todayKey = getTodayDateKey();
+  const isWordRoom = getWordRoomType(room) === "word";
 
   const toggleButton = document.getElementById("word-room-plan-toggle-button");
   const dateControls = document.getElementById("word-room-plan-date-controls");
@@ -4074,7 +4088,14 @@ function renderWordRoomPlans(plans, room) {
       `${wordRoomPlanMonth.getFullYear()}년 ${wordRoomPlanMonth.getMonth() + 1}월`;
   } else {
     document.getElementById("word-room-plan-date-title").textContent =
-      formatWordRoomPlanDate(wordRoomPlanDate);
+      isWordRoom
+        ? formatWordRoomPlanRange(wordRoomPlanDate)
+        : formatWordRoomPlanDate(wordRoomPlanDate);
+    const previousButton = document.getElementById("word-room-plan-previous-button");
+    const nextButton = document.getElementById("word-room-plan-next-button");
+    previousButton.setAttribute("aria-label", isWordRoom ? "하루 전 말씀 계획" : "전날 계획");
+    nextButton.setAttribute("aria-label", isWordRoom ? "하루 다음 말씀 계획" : "다음 날 계획");
+    nextButton.disabled = isWordRoom && localDateKey(wordRoomPlanDate) >= todayKey;
   }
 
   if (plans.length === 0) {
@@ -4083,7 +4104,9 @@ function renderWordRoomPlans(plans, room) {
     const typeLabel = getWordRoomType(room) === "prayer" ? "기도" : "말씀";
     empty.textContent = showAllWordRoomPlans
       ? "이 달에 등록된 " + typeLabel + " 계획이 없습니다."
-      : "이 날짜에 등록된 " + typeLabel + " 계획이 없습니다.";
+      : isWordRoom
+        ? "이 기간에 등록된 말씀 계획이 없습니다."
+        : "이 날짜에 등록된 기도 계획이 없습니다.";
     list.append(empty);
     return;
   }
@@ -4094,10 +4117,7 @@ function renderWordRoomPlans(plans, room) {
     card.open = !showAllWordRoomPlans;
     const summary = document.createElement("summary");
     const date = document.createElement("strong");
-    const dayLabel = plan.date === todayKey ? "오늘 · " : "";
-    date.textContent = dayLabel + new Date(plan.date + "T00:00:00").toLocaleDateString("ko-KR", {
-      year: "numeric", month: "long", day: "numeric", weekday: "short"
-    });
+    date.textContent = formatWordRoomPlanDate(new Date(plan.date + "T00:00:00"));
     const passage = document.createElement("span");
     passage.className = "word-room-plan-summary-title";
     passage.textContent = plan.passage;
@@ -4161,6 +4181,16 @@ async function saveWordRoomPlanComment(room, plan, textarea, container) {
   const content = textarea.value.trim();
   if (!content || content.length > 1000) return;
   try {
+    const shouldCheckBible = getWordRoomType(room) === "word" &&
+      isValidBibleCheckDate(plan.date);
+    let personalBibleSnapshot = null;
+    let communityBibleSnapshot = null;
+    if (shouldCheckBible) {
+      [personalBibleSnapshot, communityBibleSnapshot] = await Promise.all([
+        getDoc(getBibleCheckReference(plan.date)),
+        getDoc(getCommunityBibleReference(plan.date))
+      ]);
+    }
     const batch = writeBatch(db);
     batch.set(doc(collection(db, "wordRooms", room.id, "plans", plan.id, "comments")), {
       uid: auth.currentUser.uid,
@@ -4170,11 +4200,72 @@ async function saveWordRoomPlanComment(room, plan, textarea, container) {
       reactionGraceCount: 0,
       createdAt: serverTimestamp()
     });
+    if (shouldCheckBible && !personalBibleSnapshot.exists()) {
+      batch.set(getBibleCheckReference(plan.date), {
+        uid: auth.currentUser.uid,
+        date: plan.date,
+        checked: true,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+    }
+    if (shouldCheckBible && !communityBibleSnapshot.exists()) {
+      batch.set(getCommunityBibleReference(plan.date), {
+        uid: auth.currentUser.uid,
+        date: plan.date,
+        createdAt: serverTimestamp()
+      });
+    }
     addWordRoomActivity(batch, room.id, "planComment");
     await batch.commit();
     textarea.value = "";
     await renderWordRoomPlanComments(room, plan, container);
   } catch { setMessage("word-room-detail-message", "나눔을 저장하지 못했습니다.", "error"); }
+}
+
+async function checkBibleFromWordRoom(plan, button, message) {
+  if (!isValidBibleCheckDate(plan.date)) return;
+  const originalText = button.textContent;
+  button.disabled = true;
+  button.textContent = "저장 중...";
+  message.textContent = "";
+  try {
+    const personalReference = getBibleCheckReference(plan.date);
+    const communityReference = getCommunityBibleReference(plan.date);
+    const [personalSnapshot, communitySnapshot] = await Promise.all([
+      getDoc(personalReference),
+      getDoc(communityReference)
+    ]);
+    const batch = writeBatch(db);
+    let hasWrites = false;
+    if (!personalSnapshot.exists()) {
+      batch.set(personalReference, {
+        uid: auth.currentUser.uid,
+        date: plan.date,
+        checked: true,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+      hasWrites = true;
+    }
+    if (!communitySnapshot.exists()) {
+      batch.set(communityReference, {
+        uid: auth.currentUser.uid,
+        date: plan.date,
+        createdAt: serverTimestamp()
+      });
+      hasWrites = true;
+    }
+    if (hasWrites) await batch.commit();
+    button.textContent = "✓ 말씀 읽음 완료";
+    button.classList.add("completed");
+    button.disabled = true;
+    message.textContent = "말씀체크에 기록했습니다.";
+  } catch {
+    button.disabled = false;
+    button.textContent = originalText;
+    message.textContent = "말씀체크를 저장하지 못했습니다. 다시 시도해주세요.";
+  }
 }
 
 async function deleteWordRoomPlanComment(room, plan, comment, container) {
@@ -4190,10 +4281,34 @@ async function deleteWordRoomPlanComment(room, plan, comment, container) {
 async function renderWordRoomPlanComments(room, plan, container) {
   container.replaceChildren();
   const isMember = room.memberUids.includes(auth.currentUser.uid);
-  const snapshot = await getDocs(query(
+  const isCheckableWordPlan = isMember && getWordRoomType(room) === "word" &&
+    isValidBibleCheckDate(plan.date);
+  const [snapshot, bibleSnapshot] = await Promise.all([
+    getDocs(query(
     collection(db, "wordRooms", room.id, "plans", plan.id, "comments"),
     orderBy("createdAt", "desc"), limit(50)
-  ));
+    )),
+    isCheckableWordPlan
+      ? getDoc(getBibleCheckReference(plan.date))
+      : Promise.resolve(null)
+  ]);
+  if (isCheckableWordPlan) {
+    const checkPanel = document.createElement("div");
+    checkPanel.className = "word-room-bible-check";
+    const checkMessage = document.createElement("p");
+    const isChecked = bibleSnapshot.exists() && bibleSnapshot.data().checked === true;
+    checkMessage.textContent = isChecked
+      ? "이 날짜의 말씀 읽음이 기록되어 있습니다."
+      : "말씀을 읽었다면 이곳에서 바로 체크할 수 있어요.";
+    const checkButton = createPrayerActionButton(
+      isChecked ? "✓ 말씀 읽음 완료" : "말씀 읽음 체크",
+      "secondary-button word-room-bible-check-button" + (isChecked ? " completed" : ""),
+      () => checkBibleFromWordRoom(plan, checkButton, checkMessage)
+    );
+    checkButton.disabled = isChecked;
+    checkPanel.append(checkMessage, checkButton);
+    container.append(checkPanel);
+  }
   for (const item of snapshot.docs) {
     const comment = { id: item.id, ...item.data() };
     const row = document.createElement("article");
@@ -4251,11 +4366,23 @@ async function loadWordRoomPlans(room) {
       limit(50)
     );
   } else {
-    plansQuery = query(
-      plansCollection,
-      where("date", "==", localDateKey(wordRoomPlanDate)),
-      limit(10)
-    );
+    if (getWordRoomType(room) === "word") {
+      const rangeEnd = localDateKey(wordRoomPlanDate);
+      const rangeStart = localDateKey(getPreviousWordRoomPlanDate(wordRoomPlanDate));
+      plansQuery = query(
+        plansCollection,
+        where("date", ">=", rangeStart),
+        where("date", "<=", rangeEnd),
+        orderBy("date", "desc"),
+        limit(20)
+      );
+    } else {
+      plansQuery = query(
+        plansCollection,
+        where("date", "==", localDateKey(wordRoomPlanDate)),
+        limit(10)
+      );
+    }
   }
   const snapshot = await getDocs(plansQuery);
   wordRoomPlans = snapshot.docs.map((planDocument) => ({
@@ -4281,6 +4408,8 @@ async function toggleWordRoomPlans() {
 async function changeWordRoomPlanDate(offset) {
   const room = wordRoomCache.get(currentWordRoomId);
   if (!room || showAllWordRoomPlans) return;
+  if (getWordRoomType(room) === "word" && offset > 0 &&
+      localDateKey(wordRoomPlanDate) >= getTodayDateKey()) return;
   wordRoomPlanDate = new Date(
     wordRoomPlanDate.getFullYear(),
     wordRoomPlanDate.getMonth(),
