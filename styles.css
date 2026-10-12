@@ -1938,6 +1938,7 @@
     .word-room-plan-month-controls { display: grid; grid-template-columns: 42px 1fr 42px; align-items: center; gap: 8px; margin: 14px 0 4px; text-align: center; }
     .word-room-plan-month-controls[hidden] { display: none; }
     .word-room-plan-month-controls button { width: 42px; height: 42px; border: 1px solid #D8CFC2; border-radius: 12px; background: white; color: #62594F; font-size: 24px; }
+    .word-room-plan-month-controls button:disabled { cursor: default; opacity: 0.35; }
     .word-room-plan-month-controls strong { color: #51483F; font-size: 15px; }
     .word-room-plan-card { border: 1px solid #E5DDD2; border-radius: 14px; background: #FCFBF8; overflow: hidden; }
     .word-room-plan-card summary { padding: 16px; cursor: pointer; list-style: none; }
@@ -1950,6 +1951,11 @@
     .word-room-plan-card p { margin: 12px 0 0 !important; white-space: pre-wrap; overflow-wrap: anywhere; }
     .word-room-plan-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
     .word-room-plan-comments { display: grid; gap: 10px; margin-top: 18px; padding-top: 16px; border-top: 1px solid #E5DDD2; }
+    .word-room-bible-check { display: grid; gap: 7px; padding: 12px; border: 1px solid #E2D7C9; border-radius: 13px; background: #FFFDF9; }
+    .word-room-bible-check p { margin: 0 !important; color: #62594F; font-size: 13px; line-height: 1.45; }
+    .word-room-bible-check-button { height: 44px; margin: 0; border-radius: 12px; font-size: 14px; }
+    .word-room-bible-check-button.completed,
+    .word-room-bible-check-button.completed:disabled { cursor: default; border-color: #BFD3B8; background: #EDF5EA; color: #42623D; opacity: 1; }
     .word-room-plan-comments textarea { width: 100%; padding: 12px 14px; border: 1px solid #DDD3C7; border-radius: 14px; background: white; font: inherit; }
     .word-room-comment { padding: 13px; border-radius: 12px; background: #F8F5EF; }
     .word-room-comment-meta { display: flex; align-items: baseline; gap: 6px; }
