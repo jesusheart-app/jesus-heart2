@@ -4052,7 +4052,7 @@ function getPreviousWordRoomPlanDate(date) {
 }
 
 function formatWordRoomPlanRange(endDate) {
-  if (localDateKey(endDate) === getTodayDateKey()) return "어제 · 오늘";
+  if (localDateKey(endDate) === getTodayDateKey()) return "오늘";
   const startDate = getPreviousWordRoomPlanDate(endDate);
   const formatDate = (date) => date.toLocaleDateString("ko-KR", {
     month: "long", day: "numeric"
