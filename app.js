@@ -4067,12 +4067,51 @@ function formatWordRoomCommentTime(createdAt) {
   });
 }
 
+function renderPreviousWordRoomPlanSummary(plan, room, list) {
+  const card = document.createElement("article");
+  card.className = "word-room-previous-plan-summary";
+
+  const date = new Date(plan.date + "T00:00:00");
+  const yesterday = getPreviousWordRoomPlanDate(new Date());
+  const dateLabel = document.createElement("span");
+  dateLabel.className = "word-room-previous-plan-date";
+  dateLabel.textContent = (plan.date === localDateKey(yesterday) ? "어제 · " : "이전 날 · ") +
+    date.toLocaleDateString("ko-KR", { month: "long", day: "numeric" });
+
+  const passage = document.createElement("strong");
+  passage.className = "word-room-previous-plan-title";
+  passage.textContent = plan.passage;
+
+  const status = document.createElement("span");
+  status.className = "word-room-previous-plan-status";
+  status.textContent = "읽음 · 나눔 현황을 불러오는 중...";
+  status.setAttribute("aria-live", "polite");
+
+  card.append(dateLabel, passage, status);
+  list.append(card);
+
+  Promise.all([
+    getDocs(collection(db, "wordRooms", room.id, "plans", plan.id, "comments")),
+    getDocs(collection(db, "communityBibleChecks", plan.date, "participants"))
+  ]).then(([commentsSnapshot, participantsSnapshot]) => {
+    const memberUids = new Set(room.memberUids || []);
+    const readCount = participantsSnapshot.docs.filter((participant) =>
+      memberUids.has(participant.id)
+    ).length;
+    status.textContent = `읽음 ${readCount}명 · 나눔 ${commentsSnapshot.size}개`;
+  }).catch(() => {
+    status.textContent = "읽음·나눔 현황을 불러오지 못했습니다.";
+  });
+}
+
 function renderWordRoomPlans(plans, room) {
   const list = document.getElementById("word-room-plan-list");
   list.replaceChildren();
   wordRoomPlanCache = new Map(plans.map((plan) => [plan.id, plan]));
   const todayKey = getTodayDateKey();
   const isWordRoom = getWordRoomType(room) === "word";
+  const activeDateKey = localDateKey(wordRoomPlanDate);
+  const isRecentWordRoomView = isWordRoom && !showAllWordRoomPlans;
 
   const toggleButton = document.getElementById("word-room-plan-toggle-button");
   const dateControls = document.getElementById("word-room-plan-date-controls");
@@ -4111,7 +4150,20 @@ function renderWordRoomPlans(plans, room) {
     return;
   }
 
+  if (isRecentWordRoomView && !plans.some((plan) => plan.date === activeDateKey)) {
+    const empty = document.createElement("p");
+    empty.className = "word-room-empty word-room-active-plan-empty";
+    empty.textContent = activeDateKey === todayKey
+      ? "오늘 등록된 말씀 계획이 없습니다."
+      : "이 날짜에 등록된 말씀 계획이 없습니다.";
+    list.append(empty);
+  }
+
   plans.forEach((plan) => {
+    if (isRecentWordRoomView && plan.date !== activeDateKey) {
+      renderPreviousWordRoomPlanSummary(plan, room, list);
+      return;
+    }
     const card = document.createElement("details");
     card.className = "word-room-plan-card";
     card.open = !showAllWordRoomPlans;
